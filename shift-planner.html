@@ -1,0 +1,3306 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ShiftFlow — Gestione Turni</title>
+<script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800&family=Inter:wght@300;400;500;600&display=swap');
+
+  :root {
+    --bg: #0a0a0f;
+    --surface: #13131a;
+    --surface2: #1c1c28;
+    --border: #2a2a3a;
+    --accent: #6c63ff;
+    --accent2: #ff6584;
+    --accent3: #43e97b;
+    --warn: #ffb347;
+    --text: #e8e8f0;
+    --muted: #7070a0;
+    --shift-bg: #1e1e35;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 9999;
+    opacity: 0.3;
+  }
+
+  header {
+    padding: 20px 32px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    position: sticky;
+    top: 0;
+    background: var(--bg);
+    z-index: 100;
+  }
+
+  .logo {
+    font-family: 'Syne', sans-serif;
+    font-size: 22px;
+    font-weight: 800;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    letter-spacing: -0.5px;
+  }
+
+  .header-badge {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    border: 1px solid var(--border);
+    padding: 3px 8px;
+    border-radius: 4px;
+  }
+
+  .header-week {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .btn-excel {
+    background: linear-gradient(135deg, #1d6f42, #2ea06e);
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 7px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.15s;
+    font-family: 'Inter', sans-serif;
+  }
+  .btn-excel:hover { opacity: 0.88; transform: translateY(-1px); box-shadow: 0 4px 14px rgba(46,160,110,0.35); }
+
+  .btn-preset {
+    background: var(--surface2);
+    color: var(--text);
+    border: 1px solid var(--border);
+    padding: 8px 14px;
+    border-radius: 7px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.15s;
+    font-family: 'Inter', sans-serif;
+  }
+  .btn-preset:hover { border-color: var(--accent); color: var(--accent); transform: translateY(-1px); }
+
+  .week-nav { display: flex; align-items: center; gap: 8px; }
+
+  .week-nav button {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    width: 32px; height: 32px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 16px;
+    transition: all 0.15s;
+  }
+
+  .week-nav button:hover { background: var(--surface2); border-color: var(--accent); }
+
+  .week-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    color: var(--text);
+    min-width: 120px;
+    text-align: center;
+  }
+
+  .layout {
+    display: grid;
+    grid-template-columns: 290px 1fr;
+    height: calc(100vh - 65px);
+  }
+
+  /* SIDEBAR */
+  .sidebar {
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .sidebar-tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+
+  .stab {
+    flex: 1;
+    padding: 10px 4px;
+    text-align: center;
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+    color: var(--muted);
+    border-bottom: 2px solid transparent;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+
+  .stab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  .sidebar-content { flex: 1; overflow-y: auto; padding: 16px; }
+
+  /* Employee card */
+  .emp-card {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px;
+    margin-bottom: 10px;
+    cursor: pointer;
+    transition: all 0.15s;
+    position: relative;
+  }
+
+  .emp-card:hover { border-color: var(--accent); transform: translateX(2px); }
+  .emp-card.selected { border-color: var(--accent); background: #1a1a35; }
+
+  .emp-name {
+    font-weight: 600;
+    font-size: 14px;
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .emp-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+  .emp-info {
+    font-size: 11px;
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+    line-height: 1.8;
+  }
+
+  .emp-status {
+    position: absolute;
+    top: 10px; right: 10px;
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 100px;
+    font-weight: 600;
+  }
+
+  .status-active  { background: #1a3a2a; color: var(--accent3); }
+  .status-malattia { background: #3a1a1a; color: var(--accent2); }
+  .status-ferie   { background: #2a2a1a; color: var(--warn); }
+  .status-permesso { background: #1a2a3a; color: #64b5f6; }
+  .status-riposo  { background: #2a1a3a; color: #ce93d8; }
+
+  /* Reparto card */
+  .reparto-card {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .reparto-info { flex: 1; }
+  .reparto-name { font-weight: 600; font-size: 13px; margin-bottom: 2px; }
+  .reparto-sub  { font-size: 11px; color: var(--muted); font-family: 'DM Mono', monospace; }
+
+  .reparto-min-input {
+    width: 52px !important;
+    text-align: center;
+    padding: 4px 6px !important;
+    font-size: 13px !important;
+  }
+
+  /* Forms */
+  .form-group { margin-bottom: 14px; }
+  .form-label {
+    font-size: 11px; color: var(--muted); margin-bottom: 6px;
+    display: block; font-weight: 500;
+    text-transform: uppercase; letter-spacing: 0.5px;
+  }
+
+  input, select {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 8px 12px;
+    border-radius: 7px;
+    font-size: 13px;
+    font-family: 'Inter', sans-serif;
+    transition: border-color 0.15s;
+    outline: none;
+  }
+
+  input:focus, select:focus { border-color: var(--accent); }
+  select option { background: var(--bg); }
+
+  .btn {
+    width: 100%;
+    padding: 10px;
+    border-radius: 7px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    transition: all 0.15s;
+  }
+
+  .btn-primary { background: var(--accent); color: white; }
+  .btn-primary:hover { background: #7c74ff; transform: translateY(-1px); }
+
+  .btn-danger {
+    background: transparent;
+    border: 1px solid var(--accent2);
+    color: var(--accent2);
+    margin-top: 8px;
+  }
+  .btn-danger:hover { background: rgba(255,101,132,0.1); }
+
+  .btn-generate {
+    background: linear-gradient(135deg, var(--accent), #a78bfa);
+    color: white;
+    font-size: 14px;
+    padding: 12px;
+    letter-spacing: 0.3px;
+  }
+  .btn-generate:hover { opacity: 0.9; transform: translateY(-1px); box-shadow: 0 6px 20px rgba(108,99,255,0.3); }
+
+  .btn-reset {
+    background: transparent;
+    border: 1px solid rgba(255,101,132,0.4);
+    color: rgba(255,101,132,0.8);
+    margin-top: 6px;
+    font-size: 12px;
+    padding: 8px;
+  }
+  .btn-reset:hover { background: rgba(255,101,132,0.08); border-color: var(--accent2); color: var(--accent2); }
+
+  .btn-sm {
+    width: auto;
+    padding: 5px 12px;
+    font-size: 12px;
+    border-radius: 6px;
+  }
+
+  /* MAIN */
+  .main { overflow-y: auto; display: flex; flex-direction: column; }
+
+  /* Stats bar */
+  .stats-bar {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1px;
+    border-bottom: 1px solid var(--border);
+    background: var(--border);
+    flex-shrink: 0;
+  }
+
+  .stat-box {
+    background: var(--surface);
+    padding: 14px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .stat-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px; }
+  .stat-val { font-family: 'Syne', sans-serif; font-size: 22px; font-weight: 700; }
+  .stat-val.ok  { color: var(--accent3); }
+  .stat-val.warn { color: var(--warn); }
+  .stat-val.err  { color: var(--accent2); }
+
+  /* Calendar */
+  .cal-wrap { flex: 1; padding: 24px; overflow: auto; }
+
+  .cal-grid {
+    display: grid;
+    grid-template-columns: 200px repeat(7, 1fr);
+    gap: 1px;
+    background: var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    min-width: 900px;
+  }
+
+  .cal-header {
+    background: var(--surface);
+    padding: 12px 8px;
+    text-align: center;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+  }
+
+  .cal-header.today { color: var(--accent); }
+
+  .cal-emp-label {
+    background: var(--surface);
+    padding: 0 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 64px;
+    border-top: 1px solid var(--border);
+  }
+
+  .cal-emp-name  { font-size: 13px; font-weight: 500; }
+  .cal-emp-hours { font-size: 10px; color: var(--muted); font-family: 'DM Mono', monospace; }
+  .cal-emp-dep   { font-size: 10px; color: var(--muted); margin-top: 1px; }
+
+  .cal-cell {
+    background: var(--surface);
+    padding: 6px;
+    min-height: 64px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    transition: background 0.1s;
+  }
+
+  .cal-cell:hover { background: var(--surface2); }
+
+  .shift-pill {
+    width: 100%;
+    border-radius: 7px;
+    padding: 8px 6px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.15s;
+    position: relative;
+  }
+
+  .shift-lock-badge {
+    position: absolute;
+    top: 3px;
+    right: 4px;
+    font-size: 8px;
+    opacity: 0.55;
+    line-height: 1;
+  }
+
+  .shift-pill:hover { transform: scale(1.03); filter: brightness(1.15); }
+
+  .shift-time  { font-family: 'DM Mono', monospace; font-size: 11px; font-weight: 500; }
+  .shift-label { font-size: 10px; margin-top: 2px; opacity: 0.7; }
+
+  .shift-intera    { background: #0f2233; color: #7dd3fc; border: 1px solid #1e4060; }
+  .shift-mattina   { background: #1a3344; color: #64d8ff; border: 1px solid #2a4a5a; }
+  .shift-pomeriggio { background: #2d1f44; color: #b088ff; border: 1px solid #3d2f54; }
+  .shift-apertura  { background: #1a3a2a; color: #60efb0; border: 1px solid #2a4a3a; }
+  .shift-chiusura  { background: #3a2a1a; color: #ffb347; border: 1px solid #4a3a2a; }
+  .shift-riposo    { background: #1a1a2a; color: #5050a0; border: 1px solid #2a2a3a; font-style: italic; }
+  .shift-malattia  { background: #2d1010; color: #ff6060; border: 1px solid #3d2020; }
+  .shift-ferie     { background: #2a2710; color: #ffd060; border: 1px solid #3a3720; }
+  .shift-permesso  { background: #0f1e2d; color: #6ab4f6; border: 1px solid #1f2e3d; }
+  .shift-empty     { background: transparent; border: 1px dashed var(--border); color: var(--muted); font-size: 18px; }
+
+  .shift-dep {
+    font-size: 9px;
+    margin-top: 2px;
+    opacity: 0.65;
+    background: rgba(255,255,255,0.1);
+    border-radius: 3px;
+    padding: 1px 5px;
+    display: inline-block;
+    letter-spacing: 0.3px;
+  }
+
+  /* Coverage table */
+  .coverage-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+    margin-top: 20px;
+  }
+
+  .coverage-table th {
+    text-align: center;
+    padding: 8px 6px;
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .coverage-table th:first-child { text-align: left; }
+
+  .coverage-table td {
+    padding: 6px;
+    border-bottom: 1px solid var(--border);
+    text-align: center;
+    font-family: 'DM Mono', monospace;
+  }
+
+  .coverage-table td:first-child { text-align: left; font-family: 'Inter', sans-serif; font-weight: 500; }
+
+  .cov-ok   { color: var(--accent3); }
+  .cov-warn { color: var(--warn); }
+  .cov-err  { color: var(--accent2); font-weight: 700; }
+  .cov-skip { color: var(--border); }
+
+  /* Ore summary */
+  .ore-summary {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin-bottom: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 12px;
+  }
+
+  .ore-summary .name { font-weight: 500; }
+  .ore-summary .nums { font-family: 'DM Mono', monospace; color: var(--muted); font-size: 11px; text-align: right; }
+
+  /* Modal */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    backdrop-filter: blur(4px);
+    animation: fadeIn 0.15s ease;
+  }
+
+  @keyframes fadeIn  { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+  .modal {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    width: 400px;
+    max-width: 95vw;
+    padding: 28px;
+    animation: slideUp 0.2s ease;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+  }
+
+  .modal-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .modal-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+
+  .shift-option {
+    padding: 10px;
+    border-radius: 8px;
+    cursor: pointer;
+    text-align: center;
+    font-size: 12px;
+    font-weight: 600;
+    border: 2px solid transparent;
+    transition: all 0.15s;
+  }
+
+  .shift-option:hover { transform: scale(1.03); }
+  .shift-option.selected { border-color: white; filter: brightness(1.3); }
+
+  .modal-footer { display: flex; gap: 10px; margin-top: 20px; }
+  .modal-footer .btn { flex: 1; }
+
+  /* Toast */
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 12px 20px;
+    border-radius: 10px;
+    font-size: 13px;
+    z-index: 9000;
+    animation: slideUp 0.2s ease;
+    max-width: 320px;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.4);
+  }
+
+  .toast.success { border-color: var(--accent3); }
+  .toast.warn    { border-color: var(--warn); }
+  .toast.error   { border-color: var(--accent2); }
+
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  .divider { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
+
+  .empty-state { text-align: center; padding: 60px 20px; color: var(--muted); }
+  .empty-state .icon { font-size: 48px; margin-bottom: 12px; }
+  .empty-state h3 { font-family: 'Syne', sans-serif; color: var(--text); margin-bottom: 8px; }
+  .empty-state p  { font-size: 13px; line-height: 1.6; }
+
+  .tag {
+    display: inline-block;
+    font-size: 10px;
+    padding: 2px 7px;
+    border-radius: 100px;
+    background: rgba(108,99,255,0.15);
+    color: var(--accent);
+    font-weight: 600;
+    margin-left: 6px;
+  }
+
+  .btn-outline {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text);
+  }
+  .btn-outline:hover { border-color: var(--accent); color: var(--accent); }
+
+  .turno-config {
+    background: var(--surface2);
+    border-radius: 8px;
+    padding: 10px;
+    margin-bottom: 8px;
+    border: 1px solid var(--border);
+  }
+
+  .turno-config-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  .turno-config input { padding: 5px 8px; font-size: 12px; }
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+
+  .section-title {
+    font-size: 11px;
+    color: var(--muted);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 10px;
+  }
+
+  .warning-badge {
+    display: inline-block;
+    background: rgba(255,179,71,0.15);
+    color: var(--warn);
+    border: 1px solid rgba(255,179,71,0.3);
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-size: 11px;
+    margin-bottom: 8px;
+    width: 100%;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">ShiftFlow</div>
+  <div class="header-badge">v2.0 · Auto Scheduling</div>
+  <div class="header-week">
+    <button class="btn-preset" onclick="exportPreset()" title="Esporta tutto il preset (staff, reparti, turni) in un file JSON">⬆ Esporta Preset</button>
+    <button class="btn-preset" onclick="document.getElementById('importPresetInput').click()" title="Importa un preset salvato su un altro PC">⬇ Importa Preset</button>
+    <input type="file" id="importPresetInput" accept=".json" style="display:none" onchange="importPreset(this)">
+    <button class="btn-excel" onclick="downloadExcel().catch(e=>showToast('Errore export: '+e.message,'error'))">⬇ Scarica Excel</button>
+    <div class="week-nav">
+      <button onclick="changeWeek(-1)">‹</button>
+      <div class="week-label" id="weekLabel"></div>
+      <button onclick="changeWeek(1)">›</button>
+    </div>
+  </div>
+</header>
+
+<div class="layout">
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div class="sidebar-tabs">
+      <div class="stab active" onclick="switchTab('dipendenti',this)">👥 Staff</div>
+      <div class="stab" onclick="switchTab('aggiungi',this)">➕ Aggiungi</div>
+      <div class="stab" onclick="switchTab('reparti',this)">🏪 Reparti</div>
+      <div class="stab" onclick="switchTab('turni',this)">⚙️ Turni</div>
+    </div>
+
+    <div class="sidebar-content">
+
+      <!-- TAB DIPENDENTI -->
+      <div id="tab-dipendenti">
+        <div id="emp-list"></div>
+        <hr class="divider">
+        <button class="btn btn-generate" onclick="generateSchedule()">
+          ⚡ Genera Turni Settimana
+        </button>
+        <button class="btn btn-reset" onclick="resetWeekSchedule()">
+          🗑️ Resetta Turni Settimana
+        </button>
+        <div style="margin-top:10px;font-size:11px;color:var(--muted);text-align:center;line-height:1.6">
+          Garantisce copertura di tutti i reparti.<br>Le celle con 🔒 non vengono modificate dal generatore.<br>Clicca una cella per modificare manualmente.
+        </div>
+      </div>
+
+      <!-- TAB AGGIUNGI -->
+      <div id="tab-aggiungi" style="display:none">
+        <div class="form-group">
+          <label class="form-label">Nome dipendente</label>
+          <input type="text" id="inp-nome" placeholder="es. Mario Rossi">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Ore contrattuali / settimana</label>
+          <input type="number" id="inp-ore" value="40" min="8" max="48">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Reparti abilitati <span style="color:var(--muted);font-weight:400">(il primo è il principale)</span></label>
+          <div id="reparti-checklist" style="background:var(--bg);border:1px solid var(--border);border-radius:7px;padding:8px 12px;max-height:130px;overflow-y:auto">
+            <div style="font-size:12px;color:var(--muted)">Aggiungi prima i reparti dal tab 🏪</div>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Ruolo</label>
+          <select id="inp-ruolo">
+            <option>Cassiere</option>
+            <option>Commesso</option>
+            <option>Responsabile</option>
+            <option>Magazziniere</option>
+            <option>Part-time</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Colore identificativo</label>
+          <input type="color" id="inp-colore" value="#6c63ff" style="height:38px;padding:4px 8px;cursor:pointer">
+        </div>
+        <button class="btn btn-primary" onclick="addEmployee()">Aggiungi Dipendente</button>
+
+        <hr class="divider">
+
+        <div class="section-title">Rimuovi dipendente</div>
+        <select id="sel-remove" style="margin-bottom: 8px">
+          <option value="">-- seleziona --</option>
+        </select>
+        <button class="btn btn-danger" onclick="removeEmployee()">Rimuovi</button>
+      </div>
+
+      <!-- TAB REPARTI -->
+      <div id="tab-reparti" style="display:none">
+        <div class="section-title">Reparti configurati</div>
+        <div id="reparti-list"></div>
+
+        <hr class="divider">
+
+        <div class="section-title">Aggiungi reparto</div>
+        <div class="form-group">
+          <label class="form-label">Nome reparto</label>
+          <input type="text" id="inp-rep-nome" placeholder="es. Cassa, Freschissimi...">
+        </div>
+        <div class="two-col">
+          <div class="form-group">
+            <label class="form-label">Min. dipendenti al giorno</label>
+            <input type="number" id="inp-rep-min" value="1" min="1" max="20">
+          </div>
+          <div class="form-group">
+            <label class="form-label" style="color:var(--accent2)">Max dipendenti al giorno</label>
+            <input type="number" id="inp-rep-max" min="1" max="20" placeholder="Nessun limite">
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label" style="display:flex;align-items:center;gap:8px;cursor:pointer">
+            <input type="checkbox" id="inp-rep-dom-chiuso" style="width:auto;accent-color:var(--accent)">
+            Chiuso la domenica
+          </label>
+        </div>
+        <button class="btn btn-primary" onclick="addReparto()">Aggiungi Reparto</button>
+
+        <hr class="divider">
+        <div style="font-size:11px;color:var(--muted);line-height:1.6">
+          <strong style="color:var(--text)">MIN/GG</strong> — dipendenti minimi garantiti ogni giorno.<br>
+          <strong style="color:var(--accent2)">MAX/GG</strong> — dipendenti massimi per giorno (lascia vuoto = nessun limite). Se il reparto supera il max, il generatore mette a riposo chi è in eccesso.
+        </div>
+      </div>
+
+      <!-- TAB TURNI CONFIG -->
+      <div id="tab-turni" style="display:none">
+        <div class="section-title">Fasce orarie turni</div>
+        <div class="warning-badge" style="background:rgba(108,99,255,0.1);color:var(--accent);border-color:rgba(108,99,255,0.3)">
+          Il generatore assegna <strong>Giornata Intera</strong> + <strong>1 mezza giornata</strong> (sempre di Pomeriggio) + <strong>1 giorno di riposo</strong> per dipendente = <strong>1,5 giorni di riposo totali</strong>. Dove un reparto ha 2+ lavoratori, uno inizia 30 min dopo. Le ore minime contrattuali (es. 40h) sono garantite.<br>
+          La domenica usa l'orario di apertura domenicale configurato qui sotto.
+        </div>
+        <div id="turni-config-list"></div>
+
+        <hr class="divider">
+        <div class="section-title">Orari store</div>
+        <div class="two-col">
+          <div class="form-group">
+            <label class="form-label">Apertura</label>
+            <input type="time" id="store-open" value="09:30">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Chiusura</label>
+            <input type="time" id="store-close" value="20:00">
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Domenica aperto</label>
+          <select id="domenica-open" onchange="domenicaAperto=this.value==='1';saveData();showToast(domenicaAperto?'✅ Domenica: aperto':'🌙 Domenica: chiuso','success')">
+            <option value="0">Chiuso (tutti a riposo)</option>
+            <option value="1">Aperto (genera turni normali)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Orario apertura domenicale</label>
+          <input type="time" id="domenica-apertura" value="10:00">
+        </div>
+
+        <hr class="divider">
+        <div class="section-title">Pausa pranzo</div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:10px;line-height:1.5">
+          Il negozio rimane chiuso durante questa fascia. Le ore di pausa vengono escluse dal calcolo ore e dall'export Excel.
+        </div>
+        <div class="two-col">
+          <div class="form-group">
+            <label class="form-label">Inizio pausa</label>
+            <input type="time" id="lunch-start" value="13:00">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Fine pausa</label>
+            <input type="time" id="lunch-end" value="15:00">
+          </div>
+        </div>
+
+        <button class="btn btn-primary" onclick="saveTurniConfig()">Salva configurazione</button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- MAIN -->
+  <div class="main">
+    <div class="stats-bar">
+      <div class="stat-box">
+        <div class="stat-label">Attivi oggi</div>
+        <div class="stat-val ok" id="stat-attivi">0</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-label">Assenti oggi</div>
+        <div class="stat-val warn" id="stat-assenti">0</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-label">Straordinari sett.</div>
+        <div class="stat-val" id="stat-straordinari" style="color:var(--accent)">0h</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-label">Copertura reparti</div>
+        <div class="stat-val ok" id="stat-coverage">—</div>
+      </div>
+    </div>
+
+    <div class="cal-wrap">
+      <div id="calendar-container">
+        <div class="empty-state">
+          <div class="icon">📅</div>
+          <h3>Nessun turno generato</h3>
+          <p>1. Aggiungi i reparti (tab 🏪)<br>2. Aggiungi i dipendenti (tab ➕)<br>3. Clicca <strong>"Genera Turni Settimana"</strong></p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL SHIFT EDITOR -->
+<div class="modal-overlay" id="shift-modal" style="display:none" onclick="closeModalOutside(event)">
+  <div class="modal">
+    <div class="modal-title">
+      <span id="modal-icon">✏️</span>
+      <span id="modal-title-text">Modifica turno</span>
+    </div>
+    <div id="modal-emp-info" style="font-size:12px;color:var(--muted);margin-bottom:16px;"></div>
+    <div class="modal-grid" id="shift-options-grid"></div>
+    <div class="form-group" id="custom-time-group" style="margin-top:12px">
+      <label class="form-label">Orari personalizzati (mattina / pomeriggio)</label>
+      <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px">
+        <span style="color:var(--muted);width:80px;font-size:12px">Mattina</span>
+        <input type="time" id="custom-m-start" style="flex:1">
+        <span style="color:var(--muted)">–</span>
+        <input type="time" id="custom-m-end" style="flex:1">
+      </div>
+      <div style="display:flex;gap:6px;align-items:center">
+        <span style="color:var(--muted);width:80px;font-size:12px">Pomeriggio</span>
+        <input type="time" id="custom-p-start" style="flex:1">
+        <span style="color:var(--muted)">–</span>
+        <input type="time" id="custom-p-end" style="flex:1">
+      </div>
+      <small style="color:var(--muted);margin-top:4px;display:block">Compila mattina e/o pomeriggio: il turno si blocca 🔒 e le ore si ricalcolano. La pausa tra le due fasce è libera.</small>
+    </div>
+    <div class="form-group" id="absence-reason-group">
+      <label class="form-label">Note (opzionale)</label>
+      <input type="text" id="absence-note" placeholder="es. influenza, vacanza...">
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal()">Annulla</button>
+      <button class="btn btn-primary" onclick="applyShiftChange()">Applica</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ==================== STATE ====================
+let employees = []; // { id, nome, ore, ruolo, reparti: ['rId',...], colore }
+let repartiSelOrder = []; // tracks checkbox click order for priority
+let schedule  = {}; // { empId: { 'YYYY-MM-DD': { type, label, start, end, note, reparto } } }
+let reparti   = [];
+let turniConfig = [
+  { id: 'intera',     label: 'Giornata Intera', start: '09:30', end: '20:00', cssClass: 'shift-intera' },
+  { id: 'mattina',    label: 'Solo Mattina',    start: '09:30', end: '13:00', cssClass: 'shift-mattina' },
+  { id: 'pomeriggio', label: 'Solo Pomeriggio', start: '15:30', end: '20:00', cssClass: 'shift-pomeriggio' },
+];
+let domenicaAperto    = false;
+let domenicaApertura  = '10:00'; // store open time on Sundays
+
+let currentWeekStart = null;
+let selectedShiftType = null;
+let _pendingEmpId = null;
+let _pendingDate  = null;
+
+const ABSENCE_TYPES = [
+  { id: 'riposo',   label: 'Riposo',   icon: '🌙', cssClass: 'shift-riposo' },
+  { id: 'malattia', label: 'Malattia', icon: '🤒', cssClass: 'shift-malattia' },
+  { id: 'ferie',    label: 'Ferie',    icon: '🏖️', cssClass: 'shift-ferie' },
+  { id: 'permesso', label: 'Permesso', icon: '📋', cssClass: 'shift-permesso' },
+];
+
+const COLORS = ['#6c63ff','#ff6584','#43e97b','#ffb347','#64d8ff','#f093fb','#a8edea','#ffd460','#ff9a9e','#a18cd1'];
+let colorIdx = 0;
+let lunchBreakStart = "13:00";
+let lunchBreakEnd   = "15:00";
+
+// ==================== PERSISTENCE ====================
+function saveData() {
+  try {
+    localStorage.setItem('shiftflow_v3', JSON.stringify({
+      employees, schedule, turniConfig, reparti, domenicaAperto, domenicaApertura, lunchBreakStart, lunchBreakEnd
+    }));
+  } catch(e) {}
+}
+
+function loadData() {
+  try {
+    const migrateEmps = (arr) => {
+      arr.forEach(emp => {
+        if (!Array.isArray(emp.reparti)) {
+          emp.reparti = emp.reparto ? [emp.reparto] : [];
+          delete emp.reparto;
+        }
+      });
+    };
+
+    const raw = localStorage.getItem('shiftflow_v3');
+    if (raw) {
+      const d = JSON.parse(raw);
+      if (Array.isArray(d.employees))   employees   = d.employees;
+      if (d.schedule)                    schedule    = d.schedule;
+      if (Array.isArray(d.turniConfig) && d.turniConfig.length) turniConfig = d.turniConfig;
+      if (Array.isArray(d.reparti))      reparti     = d.reparti;
+      if (typeof d.domenicaAperto === 'boolean') domenicaAperto = d.domenicaAperto;
+      if (d.domenicaApertura) domenicaApertura = d.domenicaApertura;
+      if (d.lunchBreakStart) lunchBreakStart = d.lunchBreakStart;
+      if (d.lunchBreakEnd)   lunchBreakEnd   = d.lunchBreakEnd;
+      migrateEmps(employees);
+      return;
+    }
+
+    // Migrate employees, schedule and reparti from v2 — turniConfig resets to new defaults
+    const v2raw = localStorage.getItem('shiftflow_v2');
+    if (v2raw) {
+      const d = JSON.parse(v2raw);
+      if (Array.isArray(d.employees))          employees      = d.employees;
+      if (d.schedule)                           schedule       = d.schedule;
+      if (Array.isArray(d.reparti))             reparti        = d.reparti;
+      if (typeof d.domenicaAperto === 'boolean') domenicaAperto = d.domenicaAperto;
+      migrateEmps(employees);
+    }
+  } catch(e) {}
+}
+
+// ==================== IMPORT / EXPORT PRESET ====================
+function exportPreset() {
+  const data = { employees, schedule, turniConfig, reparti, domenicaAperto, domenicaApertura, lunchBreakStart, lunchBreakEnd };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  const date = new Date().toISOString().slice(0, 10);
+  a.href     = url;
+  a.download = `shiftflow-preset-${date}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('Preset esportato!', 'success');
+}
+
+function importPreset(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const d = JSON.parse(e.target.result);
+      if (!Array.isArray(d.employees) || !Array.isArray(d.reparti)) {
+        showToast('File non valido: preset ShiftFlow mancante.', 'error');
+        return;
+      }
+      employees        = d.employees;
+      schedule         = d.schedule || {};
+      turniConfig      = Array.isArray(d.turniConfig) && d.turniConfig.length ? d.turniConfig : turniConfig;
+      reparti          = d.reparti;
+      domenicaAperto   = typeof d.domenicaAperto === 'boolean' ? d.domenicaAperto : domenicaAperto;
+      domenicaApertura = d.domenicaApertura || domenicaApertura;
+      lunchBreakStart  = d.lunchBreakStart  || lunchBreakStart;
+      lunchBreakEnd    = d.lunchBreakEnd    || lunchBreakEnd;
+      saveData();
+      renderEmpList();
+      renderCalendar();
+      renderRepartiList();
+      renderTurniConfig();
+      showToast('Preset importato con successo!', 'success');
+    } catch {
+      showToast('Errore: file JSON non valido.', 'error');
+    }
+  };
+  reader.readAsText(file);
+  input.value = '';
+}
+
+// ==================== UTILS ====================
+function getMonday(d) {
+  const date = new Date(d);
+  const day  = date.getDay();
+  const diff = date.getDate() - day + (day === 0 ? -6 : 1);
+  date.setDate(diff);
+  date.setHours(0,0,0,0);
+  return date;
+}
+
+function addDays(d, n) {
+  const date = new Date(d);
+  date.setDate(date.getDate() + n);
+  return date;
+}
+
+function fmt(d)  { return d.toISOString().slice(0,10); }
+function genId() { return Math.random().toString(36).slice(2,9); }
+
+function parseHour(t) {
+  if (!t) return 0;
+  const [h,m] = t.split(':').map(Number);
+  return h + m/60;
+}
+
+function shiftHours(t) {
+  const sh  = parseHour(t.start);
+  const eh  = parseHour(t.end);
+  // Turno spezzato con pausa personalizzata (mattina+pomeriggio manuali):
+  // sottrai quella pausa esplicita invece della pausa pranzo standard.
+  if (t.breakStart && t.breakEnd) {
+    return (eh - sh) - (parseHour(t.breakEnd) - parseHour(t.breakStart));
+  }
+  const lsh = parseHour(lunchBreakStart);
+  const leh = parseHour(lunchBreakEnd);
+  const raw = eh - sh;
+  // Subtract lunch break duration if the shift spans the entire pause
+  if (sh < lsh && eh > leh) return raw - (leh - lsh);
+  return raw;
+}
+
+function addMinutes(timeStr, mins) {
+  const [h, m] = timeStr.split(':').map(Number);
+  const total = h * 60 + m + mins;
+  return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
+}
+
+function getWeekDates() {
+  return Array.from({length:7}, (_,i) => addDays(currentWeekStart, i));
+}
+
+function dayName(d) {
+  return ['Dom','Lun','Mar','Mer','Gio','Ven','Sab'][d.getDay()];
+}
+
+function isAbsence(type) {
+  return ['malattia','ferie','permesso'].includes(type);
+}
+
+function empReparti(emp) {
+  if (Array.isArray(emp.reparti)) return emp.reparti.filter(Boolean);
+  if (emp.reparto) return [emp.reparto];
+  return [];
+}
+
+function isManualLocked(empId, dk) {
+  const ex = (schedule[empId] || {})[dk];
+  // Locked if explicitly flagged manual, OR if it's an absence type (backward compat for old data)
+  return !!(ex && (ex.manual || isAbsence(ex.type)));
+}
+
+// ==================== WEEK NAV ====================
+function updateWeekLabel() {
+  const end  = addDays(currentWeekStart, 6);
+  const opts = { day:'numeric', month:'short' };
+  document.getElementById('weekLabel').textContent =
+    currentWeekStart.toLocaleDateString('it-IT', opts) + ' – ' + end.toLocaleDateString('it-IT', opts);
+}
+
+function changeWeek(dir) {
+  currentWeekStart = addDays(currentWeekStart, dir * 7);
+  updateWeekLabel();
+  renderCalendar();
+}
+
+// ==================== REPARTI ====================
+function addReparto() {
+  const nome       = document.getElementById('inp-rep-nome').value.trim();
+  const min        = parseInt(document.getElementById('inp-rep-min').value) || 1;
+  const maxRaw     = parseInt(document.getElementById('inp-rep-max').value);
+  const max        = (!maxRaw || maxRaw <= 0) ? null : Math.max(min, maxRaw);
+  const domChiuso  = document.getElementById('inp-rep-dom-chiuso')?.checked ?? false;
+  if (!nome) { showToast('Inserisci un nome per il reparto', 'warn'); return; }
+
+  reparti.push({ id: genId(), nome, minCopertura: min, maxCopertura: max, chiusoDomenica: domChiuso });
+  document.getElementById('inp-rep-nome').value = '';
+  document.getElementById('inp-rep-min').value  = '1';
+  document.getElementById('inp-rep-max').value  = '';
+  if (document.getElementById('inp-rep-dom-chiuso')) document.getElementById('inp-rep-dom-chiuso').checked = false;
+
+  renderRepartiList();
+  populateRepartiChecklist();
+  saveData();
+  showToast(`🏪 Reparto "${nome}" aggiunto`, 'success');
+}
+
+function removeReparto(id) {
+  const rep = reparti.find(r => r.id === id);
+  reparti = reparti.filter(r => r.id !== id);
+  employees.forEach(emp => {
+    if (Array.isArray(emp.reparti)) emp.reparti = emp.reparti.filter(rId => rId !== id);
+  });
+  renderRepartiList();
+  populateRepartiChecklist();
+  renderEmpList();
+  saveData();
+  showToast(`🗑️ Reparto "${rep?.nome}" rimosso`, 'warn');
+}
+
+function updateRepartoMin(id, val) {
+  const rep = reparti.find(r => r.id === id);
+  if (rep) rep.minCopertura = Math.max(1, parseInt(val) || 1);
+  saveData();
+}
+
+function updateRepartoMax(id, val) {
+  const rep = reparti.find(r => r.id === id);
+  if (!rep) return;
+  const n = parseInt(val);
+  rep.maxCopertura = (!n || n <= 0) ? null : Math.max(rep.minCopertura, n);
+  saveData();
+}
+
+function updateRepartoDomenica(id, val) {
+  const rep = reparti.find(r => r.id === id);
+  if (rep) rep.chiusoDomenica = !!val;
+  renderRepartiList();
+  saveData();
+}
+
+function renderRepartiList() {
+  const el = document.getElementById('reparti-list');
+  if (!reparti.length) {
+    el.innerHTML = `<div style="font-size:12px;color:var(--muted);text-align:center;padding:16px">Nessun reparto. Aggiungine uno qui sotto.</div>`;
+    return;
+  }
+  el.innerHTML = reparti.map(rep => {
+    const count = employees.filter(e => empReparti(e).includes(rep.id)).length;
+    return `
+    <div class="reparto-card">
+      <div class="reparto-info">
+        <div class="reparto-name">${rep.nome}</div>
+        <div class="reparto-sub">${count} dipendente${count !== 1 ? 'i' : ''}</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px">
+        <div>
+          <div style="font-size:10px;color:var(--muted);text-align:center;margin-bottom:2px">MIN/GG</div>
+          <input type="number" class="reparto-min-input" value="${rep.minCopertura}" min="1" max="20"
+            onchange="updateRepartoMin('${rep.id}', this.value)">
+        </div>
+        <div>
+          <div style="font-size:10px;color:var(--accent2);text-align:center;margin-bottom:2px">MAX/GG</div>
+          <input type="number" class="reparto-min-input" style="border-color:var(--accent2)"
+            value="${rep.maxCopertura ?? ''}" min="1" max="20" placeholder="∞"
+            onchange="updateRepartoMax('${rep.id}', this.value)">
+        </div>
+        <div>
+          <div style="font-size:10px;color:var(--muted);text-align:center;margin-bottom:2px">DOM.</div>
+          <button class="btn btn-sm" style="margin-top:0;padding:4px 7px;font-size:12px;${rep.chiusoDomenica ? 'color:#ffb347;border-color:#ffb347' : 'opacity:0.4'}"
+            onclick="updateRepartoDomenica('${rep.id}', ${!rep.chiusoDomenica})"
+            title="${rep.chiusoDomenica ? 'Domenica CHIUSO — clicca per aprire' : 'Domenica aperto — clicca per chiudere'}">
+            ${rep.chiusoDomenica ? '🔒' : '🔓'}
+          </button>
+        </div>
+        <button class="btn btn-sm btn-danger" style="margin-top:0;padding:5px 8px" onclick="removeReparto('${rep.id}')">✕</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function toggleRepartoSel(rId, checked) {
+  repartiSelOrder = repartiSelOrder.filter(id => id !== rId);
+  if (checked) repartiSelOrder.push(rId);
+}
+
+function populateRepartiChecklist() {
+  const el = document.getElementById('reparti-checklist');
+  if (!el) return;
+  repartiSelOrder = [];
+  if (!reparti.length) {
+    el.innerHTML = `<div style="font-size:12px;color:var(--muted)">Aggiungi prima i reparti dal tab 🏪</div>`;
+    return;
+  }
+  el.innerHTML = reparti.map(r => `
+    <label style="display:flex;align-items:center;gap:8px;padding:4px 0;cursor:pointer;font-size:13px">
+      <input type="checkbox" value="${r.id}" style="width:auto;accent-color:var(--accent)"
+        onchange="toggleRepartoSel('${r.id}', this.checked)">
+      ${r.nome}
+    </label>`).join('');
+}
+
+// ==================== EMPLOYEES ====================
+function addEmployee() {
+  const nome   = document.getElementById('inp-nome').value.trim();
+  const ore    = parseInt(document.getElementById('inp-ore').value);
+  const ruolo  = document.getElementById('inp-ruolo').value;
+  const colore = document.getElementById('inp-colore').value;
+  const repartiSel = repartiSelOrder.filter(id =>
+    document.querySelector(`#reparti-checklist input[value="${id}"]`)?.checked
+  );
+
+  if (!nome) { showToast('Inserisci un nome', 'warn'); return; }
+
+  const emp = { id: genId(), nome, ore, ruolo, reparti: repartiSel, colore };
+  employees.push(emp);
+  schedule[emp.id] = {};
+
+  document.getElementById('inp-nome').value = '';
+  repartiSelOrder = [];
+  colorIdx = (colorIdx + 1) % COLORS.length;
+  document.getElementById('inp-colore').value = COLORS[colorIdx];
+
+  renderEmpList();
+  renderRepartiList();
+  updateRemoveSelect();
+  renderCalendar();
+  saveData();
+  showToast(`✅ ${nome} aggiunto!`, 'success');
+}
+
+function removeEmployee() {
+  const sel = document.getElementById('sel-remove');
+  const id  = sel.value;
+  if (!id) { showToast('Seleziona un dipendente', 'warn'); return; }
+  const emp = employees.find(e => e.id === id);
+  employees = employees.filter(e => e.id !== id);
+  delete schedule[id];
+  renderEmpList();
+  renderRepartiList();
+  updateRemoveSelect();
+  renderCalendar();
+  saveData();
+  showToast(`🗑️ ${emp.nome} rimosso`, 'warn');
+}
+
+function renderEmpList() {
+  const list  = document.getElementById('emp-list');
+  const today = fmt(new Date());
+  if (!employees.length) {
+    list.innerHTML = `<div style="font-size:12px;color:var(--muted);text-align:center;padding:20px">Nessun dipendente. Aggiungili dalla tab ➕</div>`;
+    return;
+  }
+  const statusLabels = {
+    active:'Attivo', riposo:'Riposo', malattia:'Malattia',
+    ferie:'Ferie', permesso:'Permesso',
+    intera:'In turno', mattina:'In turno', pomeriggio:'In turno', apertura:'In turno', chiusura:'In turno'
+  };
+  list.innerHTML = employees.map(emp => {
+    const todayShift = (schedule[emp.id] || {})[today];
+    const status     = todayShift ? todayShift.type : 'active';
+    const statusClass = ['malattia','ferie','permesso','riposo'].includes(status) ? `status-${status}` : 'status-active';
+    const weekHours  = calcWeekHours(emp.id);
+    const depts      = empReparti(emp).map(rId => reparti.find(r => r.id === rId)?.nome).filter(Boolean);
+    return `
+    <div class="emp-card" onclick="selectEmp('${emp.id}')">
+      <div class="emp-name">
+        <div class="emp-dot" style="background:${emp.colore}"></div>
+        ${emp.nome}
+      </div>
+      <div class="emp-info">
+        ${depts.length ? depts.join(' / ') + ' · ' : ''}${emp.ruolo} · ${emp.ore}h/sett<br>
+        Questa sett: <span style="color:${weekHours > emp.ore ? '#ff6584' : '#43e97b'}">${weekHours}h</span> / ${emp.ore}h
+      </div>
+      <div class="emp-status ${statusClass}">${statusLabels[status] || status}</div>
+    </div>`;
+  }).join('');
+}
+
+function selectEmp(id) {
+  const el = document.querySelector(`[data-emprow="${id}"]`);
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+function updateRemoveSelect() {
+  const sel = document.getElementById('sel-remove');
+  sel.innerHTML = '<option value="">-- seleziona --</option>' +
+    employees.map(e => `<option value="${e.id}">${e.nome}</option>`).join('');
+}
+
+function calcWeekHours(empId) {
+  const dates = getWeekDates();
+  let total = 0;
+  dates.forEach(d => {
+    const s = (schedule[empId] || {})[fmt(d)];
+    if (s && !['riposo','malattia','ferie','permesso'].includes(s.type)) {
+      total += shiftHours(s);
+    }
+  });
+  return Math.round(total * 10) / 10;
+}
+
+// ==================== SMART SCHEDULE GENERATION ====================
+function generateSchedule() {
+  if (!employees.length) { showToast('Aggiungi prima i dipendenti!', 'warn'); return; }
+
+  const dates   = getWeekDates();
+  const weekNum = Math.floor(new Date(currentWeekStart).getTime() / (7 * 24 * 3600 * 1000));
+
+  // 1. Clear auto-generated shifts (keep all manual/locked entries)
+  employees.forEach(emp => {
+    if (!schedule[emp.id]) schedule[emp.id] = {};
+    dates.forEach(d => {
+      const dk = fmt(d);
+      if (!isManualLocked(emp.id, dk)) delete schedule[emp.id][dk];
+    });
+  });
+
+  // 2. Hours per work day (always giornata intera)
+  const avgShiftH = turniConfig.length > 0 ? shiftHours(turniConfig[0]) : 8;
+
+  const needsCoverage = (d) => d.getDay() !== 0 || domenicaAperto;
+
+  // Employees whose every reparto is closed on Sunday don't work Sundays regardless of domenicaAperto
+  const empNeedsWork = (emp, d) => {
+    if (!needsCoverage(d)) return false;
+    if (d.getDay() === 0) {
+      const depts = empReparti(emp);
+      if (depts.length > 0 && depts.every(rId => {
+        const r = reparti.find(rep => rep.id === rId);
+        return r && r.chiusoDomenica;
+      })) return false;
+    }
+    return true;
+  };
+
+  // ── PHASE 1: work/rest planning (strict no-overtime) ──────────────────────
+
+  // planWork[empId][dk] = true → employee planned to work that day
+  const planWork = {};
+  employees.forEach(emp => {
+    planWork[emp.id] = {};
+    dates.forEach(d => {
+      const dk = fmt(d);
+      planWork[emp.id][dk] = empNeedsWork(emp, d) && !isManualLocked(emp.id, dk);
+    });
+  });
+
+  // workerCount[rId][dk] = N qualified employees planned to work
+  const workerCount = {};
+  reparti.forEach(rep => {
+    workerCount[rep.id] = {};
+    dates.forEach(d => {
+      const dk = fmt(d);
+      workerCount[rep.id][dk] = employees.filter(emp =>
+        empReparti(emp).includes(rep.id) && planWork[emp.id][dk]
+      ).length;
+    });
+  });
+
+  // Half-day hours (one work day per employee will be a half-day — the "half" of 1.5 rest days)
+  // Le mezze giornate si fanno di POMERIGGIO: le ore di riferimento sono quelle del pomeriggio.
+  const halfConfCalc = turniConfig.find(t => t.id === 'pomeriggio') || turniConfig.find(t => t.id === 'mattina');
+  const halfDayH = halfConfCalc ? shiftHours(halfConfCalc) : avgShiftH / 2;
+  const hasHalfDayConfig = !!(turniConfig.find(t => t.id === 'mattina') || turniConfig.find(t => t.id === 'pomeriggio'));
+
+  // Rest days: exactly 1 full rest day per full-time employee.
+  // The half-day already provides the "half" → total 1.5 days of rest.
+  // Formula accounts for the half-day contributing fewer hours than a full shift.
+  const restDaysNeeded = {};
+  const infeasibleEmps = []; // employees whose contract hours cannot fit in available working days
+  employees.forEach(emp => {
+    // Bugfix: un turno manuale di LAVORO deve contare come un normale giorno lavorativo,
+    // NON essere rimosso dal pool. Prima `!isManualLocked` escludeva anche i turni manuali,
+    // riducendo availableDays e quindi restDaysNeeded → rubava un giorno di riposo.
+    // Escludiamo solo i giorni OFF manuali (riposo/assenza); così restDaysNeeded resta
+    // identico al caso senza inserimenti manuali (regola invariabile: numero riposi fisso).
+    const availableDays = dates.filter(d => {
+      if (!empNeedsWork(emp, d)) return false;
+      const s = (schedule[emp.id] || {})[fmt(d)];
+      if (s && (s.type === 'riposo' || isAbsence(s.type))) return false;
+      return true;
+    }).length;
+    if (!availableDays) { restDaysNeeded[emp.id] = 0; return; }
+    let workDaysTarget;
+    if (hasHalfDayConfig) {
+      // 1 work day will be a half-day; remaining full days must cover (emp.ore - halfDayH)
+      const fullDaysNeeded = Math.ceil(Math.max(0, emp.ore - halfDayH) / avgShiftH);
+      workDaysTarget = Math.min(availableDays, fullDaysNeeded + 1);
+    } else {
+      workDaysTarget = Math.min(availableDays, Math.ceil(emp.ore / avgShiftH));
+    }
+    restDaysNeeded[emp.id] = Math.max(0, availableDays - workDaysTarget);
+    // Feasibility check: verify remaining working days can arithmetically cover emp.ore.
+    // The half-day contributes halfDayH, not avgShiftH, so subtract 1 from workDaysTarget for full days.
+    const fullWorkDays = workDaysTarget - (hasHalfDayConfig ? 1 : 0);
+    const maxAchievableH = Math.round((fullWorkDays * avgShiftH + (hasHalfDayConfig ? halfDayH : 0)) * 10) / 10;
+    if (maxAchievableH < emp.ore - 0.1) {
+      infeasibleEmps.push(emp);
+    }
+  });
+
+  // Process most-constrained employees first
+  const sortedEmps = [...employees].sort((a, b) => restDaysNeeded[b.id] - restDaysNeeded[a.id]);
+
+  sortedEmps.forEach((emp, empOrder) => {
+    const depts  = empReparti(emp);
+    let restLeft = restDaysNeeded[emp.id];
+    if (restLeft <= 0) return;
+
+    // canRest: ALL qualified reparti keep ≥ minCopertura after removal
+    const canRest = (dk) => {
+      if (!planWork[emp.id][dk] || isManualLocked(emp.id, dk)) return false;
+      if (!depts.length) return true;
+      return depts.every(rId => {
+        const rep = reparti.find(r => r.id === rId);
+        if (!rep) return true;
+        return (workerCount[rId][dk] ?? 0) - 1 >= rep.minCopertura;
+      });
+    };
+
+    const candidates = dates
+      .filter(d => canRest(fmt(d)))
+      .map(d => {
+        const dk    = fmt(d);
+        const slack = depts.length
+          ? Math.min(...depts.map(rId => {
+              const rep = reparti.find(r => r.id === rId);
+              return rep ? (workerCount[rId][dk] ?? 0) - rep.minCopertura : 99;
+            }))
+          : 99;
+        // How much this dept exceeds maxCopertura on this day (prefer resting here if > 0)
+        const maxExcess = depts.length
+          ? Math.max(...depts.map(rId => {
+              const rep = reparti.find(r => r.id === rId);
+              return rep?.maxCopertura ? Math.max(0, (workerCount[rId][dk] ?? 0) - rep.maxCopertura) : 0;
+            }))
+          : 0;
+        return { d, dk, slack, maxExcess };
+      })
+      .sort((a, b) => {
+        // 1) Prefer days where dept is over max
+        if (b.maxExcess !== a.maxExcess) return b.maxExcess - a.maxExcess;
+        // 2) Prefer days with most slack above min
+        if (b.slack !== a.slack) return b.slack - a.slack;
+        const preferred = ((empOrder + weekNum) % 5) + 1; // 1–5 = Mon–Fri, keeps weekends as work days
+        return Math.abs(a.d.getDay() - preferred) - Math.abs(b.d.getDay() - preferred);
+      });
+
+    for (let i = 0; i < candidates.length && restLeft > 0; i++) {
+      const { dk } = candidates[i];
+      planWork[emp.id][dk] = false;
+      depts.forEach(rId => { if (workerCount[rId]?.[dk] !== undefined) workerCount[rId][dk]--; });
+      restLeft--;
+    }
+
+    // EDGE-02 (loop finiteness): The preceding `for` loop and the fallback `for` below are both
+    // bounded by `restLeft > 0` AND by `candidates.length` / `fallback.length`. Both arrays are
+    // derived once from `dates` (length 7) — they cannot grow. `restLeft` decrements by exactly 1
+    // per iteration. Worst case: restLeft starts at restDaysNeeded[emp.id] (≤ avail ≤ 7) and the
+    // outer iterations run at most 7+7 = 14 times per employee. When candidates is empty (all days
+    // would violate minCopertura) the inner body simply never runs and we drop to the fallback.
+    // When fallback is also empty (employee has zero available days) `restLeft` is already 0
+    // (set at line 1376) and the early return at line 1401 prevents entry. No while loop, no
+    // recursion, no hang possible — even when the dept is entirely absent.
+    // Fallback: force rest anyway, let coverage warning surface
+    if (restLeft > 0) {
+      const fallback = dates
+        .filter(d => empNeedsWork(emp, d) && !isManualLocked(emp.id, fmt(d)) && planWork[emp.id][fmt(d)])
+        .sort((a, b) => {
+          const preferred = ((empOrder + weekNum) % 6) + 1;
+          return Math.abs(a.getDay() - preferred) - Math.abs(b.getDay() - preferred);
+        });
+      for (let i = 0; i < fallback.length && restLeft > 0; i++) {
+        const dk = fmt(fallback[i]);
+        planWork[emp.id][dk] = false;
+        depts.forEach(rId => { if (workerCount[rId]?.[dk] !== undefined) workerCount[rId][dk]--; });
+        restLeft--;
+      }
+    }
+  });
+
+  // ── PHASE 1.5: half-day assignment (1 mezza giornata per dipendente) ────────
+  // Runs BEFORE Phase 2 so half-day info is available when assigning departments.
+
+  const halfDayDate = {}; // empId → dk
+  const halfDayConf = {}; // empId → turniConfig entry (mattina or pomeriggio)
+
+  const mattinaConf    = turniConfig.find(t => t.id === 'mattina');
+  const pomeriggioConf = turniConfig.find(t => t.id === 'pomeriggio');
+
+  if (mattinaConf || pomeriggioConf) {
+    // Le mezze giornate si fanno SEMPRE di pomeriggio (richiesta negozio): il dipendente
+    // stacca il mattino e rientra nella fascia pomeridiana. La mattina resta solo come
+    // ripiego quando il turno "Solo Pomeriggio" non è configurato.
+    const pickType = () => pomeriggioConf || mattinaConf;
+
+    employees.forEach((emp) => {
+      const depts = empReparti(emp);
+
+      const allClosedSunday = depts.length > 0 && depts.every(rId => {
+        const r = reparti.find(rep => rep.id === rId);
+        return r && r.chiusoDomenica;
+      });
+
+      if (allClosedSunday) {
+        const saturday = dates.find(d => d.getDay() === 6);
+        if (saturday && planWork[emp.id][fmt(saturday)] && !isManualLocked(emp.id, fmt(saturday))) {
+          halfDayDate[emp.id] = fmt(saturday);
+          halfDayConf[emp.id] = pickType();
+        }
+      } else {
+        const mapCandidate = d => {
+          const dk = fmt(d);
+          const slack = depts.length
+            ? Math.min(...depts.map(rId => {
+                const rep = reparti.find(r => r.id === rId);
+                return rep ? (workerCount[rId][dk] ?? 0) - rep.minCopertura : 99;
+              }))
+            : 99;
+          const coHalfDays = depts.reduce((sum, rId) =>
+            sum + employees.filter(e =>
+              e.id !== emp.id &&
+              empReparti(e).includes(rId) &&
+              halfDayDate[e.id] === dk
+            ).length, 0);
+          return { dk, slack, coHalfDays };
+        };
+        const sortCandidates = (a, b) => {
+          // Tutte le mezze giornate sono pomeridiane: si minimizzano le mezze giornate
+          // sovrapposte nello stesso reparto, poi si preferisce il giorno con più margine.
+          if (a.coHalfDays !== b.coHalfDays) return a.coHalfDays - b.coHalfDays;
+          return b.slack - a.slack;
+        };
+
+        const allWorkingDays = dates.filter(d => planWork[emp.id][fmt(d)] && !isManualLocked(emp.id, fmt(d)));
+
+        const safeDays = allWorkingDays.filter(d => {
+          const dk = fmt(d);
+          return !depts.some(rId => {
+            const rep = reparti.find(r => r.id === rId);
+            if (rep?.chiusoDomenica && d.getDay() === 0) return false;
+            // Serve almeno un collega a giornata piena: essendo tutte le mezze giornate
+            // pomeridiane, nessun collega in mezza giornata può coprire la mattina.
+            const fullDayCo = employees.filter(e =>
+              e.id !== emp.id && empReparti(e).includes(rId) &&
+              planWork[e.id][dk] && !halfDayDate[e.id]
+            ).length;
+            return fullDayCo === 0;
+          });
+        });
+
+        const pool = safeDays.length ? safeDays : allWorkingDays;
+        const candidates = pool.map(mapCandidate).sort(sortCandidates);
+
+        if (candidates.length > 0) {
+          halfDayDate[emp.id] = candidates[0].dk;
+          halfDayConf[emp.id] = pickType();
+        }
+      }
+    });
+  }
+
+  // ── PHASE 2: department assignment per day ────────────────────────────────
+  // Runs AFTER Phase 1.5 so half-day info is available.
+  // Half-day employees are assigned to their dept for display but do NOT count toward
+  // assignedCount or stillNeeded — so a full-day colleague can still be routed there.
+
+  const dayAssignment = {}; // dk → empId → rId
+  dates.forEach(d => { dayAssignment[fmt(d)] = {}; });
+
+  // Tracks only FULL-DAY assignments for max enforcement (half-day workers excluded)
+  const assignedCount = {};
+  reparti.forEach(rep => {
+    assignedCount[rep.id] = {};
+    dates.forEach(d => { assignedCount[rep.id][fmt(d)] = 0; });
+  });
+
+  const atMax = (rId, dk) => {
+    const rep = reparti.find(r => r.id === rId);
+    if (!rep || !rep.maxCopertura) return false;
+    return (assignedCount[rId]?.[dk] || 0) >= rep.maxCopertura;
+  };
+
+  dates.forEach(d => {
+    if (!needsCoverage(d)) return;
+    const dk = fmt(d);
+    const workingEmps = employees.filter(emp => planWork[emp.id][dk]);
+
+    // Step A: single-reparto employees → auto-assign.
+    // Half-day workers are placed in their dept for display but excluded from assignedCount.
+    workingEmps.forEach(emp => {
+      const depts = empReparti(emp);
+      if (depts.length === 1) {
+        dayAssignment[dk][emp.id] = depts[0];
+        if (assignedCount[depts[0]] && halfDayDate[emp.id] !== dk) {
+          assignedCount[depts[0]][dk]++;
+        }
+      }
+    });
+
+    // Step B: track still-needed coverage — half-day workers don't count as full coverage
+    const stillNeeded = {};
+    reparti.forEach(rep => {
+      if (d.getDay() === 0 && rep.chiusoDomenica) { stillNeeded[rep.id] = 0; return; }
+      const alreadyAssigned = workingEmps.filter(emp =>
+        dayAssignment[dk][emp.id] === rep.id && halfDayDate[emp.id] !== dk
+      ).length;
+      stillNeeded[rep.id] = Math.max(0, rep.minCopertura - alreadyAssigned);
+    });
+
+    // Returns true if rId is a closed department on this day
+    const isClosedToday = (rId) => {
+      const rep = reparti.find(r => r.id === rId);
+      return !!(d.getDay() === 0 && rep?.chiusoDomenica);
+    };
+
+    // Step C: multi-dept employees, most constrained first, assign to most urgent reparto
+    const multiEmps = workingEmps
+      .filter(emp => empReparti(emp).length > 1 && !dayAssignment[dk][emp.id])
+      .sort((a, b) => empReparti(a).length - empReparti(b).length);
+
+    multiEmps.forEach(emp => {
+      const depts = empReparti(emp);
+      // Never assign to a dept closed today (e.g. Magazzino chiusoDomenica on Sunday)
+      const openDepts = depts.filter(rId => !isClosedToday(rId));
+      const baseDepts = openDepts.length ? openDepts : depts;
+      // Among open depts, prefer those not yet at max
+      const eligibleDepts = baseDepts.filter(rId => !atMax(rId, dk));
+      const pool = eligibleDepts.length ? eligibleDepts : baseDepts;
+      const sorted = pool.slice().sort((a, b) => {
+        const availA = workingEmps.filter(e => empReparti(e).includes(a)).length;
+        const availB = workingEmps.filter(e => empReparti(e).includes(b)).length;
+        const urgA   = (stillNeeded[a] || 0) / (availA + 0.01);
+        const urgB   = (stillNeeded[b] || 0) / (availB + 0.01);
+        if (urgB !== urgA) return urgB - urgA;
+        const repA = reparti.find(r => r.id === a);
+        const repB = reparti.find(r => r.id === b);
+        if (urgA > 0) {
+          // equal positive urgency: prefer more constrained dept (lower max = fewer alternatives)
+          const capA = repA?.maxCopertura ?? 9999;
+          const capB = repB?.maxCopertura ?? 9999;
+          if (capA !== capB) return capA - capB;
+        } else {
+          // both already covered: prefer dept with more headroom to avoid over-max
+          const headroomA = repA?.maxCopertura != null ? repA.maxCopertura - (assignedCount[a]?.[dk] || 0) : 999;
+          const headroomB = repB?.maxCopertura != null ? repB.maxCopertura - (assignedCount[b]?.[dk] || 0) : 999;
+          if (headroomA !== headroomB) return headroomB - headroomA;
+        }
+        return depts.indexOf(a) - depts.indexOf(b);
+      });
+      const chosen = sorted[0];
+      dayAssignment[dk][emp.id] = chosen;
+      if (halfDayDate[emp.id] !== dk) {
+        if (assignedCount[chosen]) assignedCount[chosen][dk]++;
+        if (stillNeeded[chosen] > 0) stillNeeded[chosen]--;
+      }
+    });
+
+    // Step D: any remaining unassigned → first open non-at-max dept, else fallback
+    workingEmps.forEach(emp => {
+      if (!dayAssignment[dk][emp.id]) {
+        const depts = empReparti(emp);
+        const openDepts = depts.filter(rId => !isClosedToday(rId));
+        const base = openDepts.length ? openDepts : depts;
+        const chosen = base.find(rId => !atMax(rId, dk)) || base[0] || depts[0] || '';
+        dayAssignment[dk][emp.id] = chosen;
+        if (chosen && assignedCount[chosen] && halfDayDate[emp.id] !== dk) assignedCount[chosen][dk]++;
+      }
+    });
+  });
+
+  // ── PHASE 2.5: smart shift-variant selection ────────────────────────────────
+  // For each employee on each full working day, picks the (start, end) pair that:
+  //   • guarantees at least 1 opener (starts at store-open) and 1 closer (ends at store-close)
+  //     per reparto per day — roles rotate each week/day for fairness
+  //   • drives each employee's cumulative hours toward their contract (emp.ore) without overshoot
+  // Variants available (offsets from store-open/close): start +0/+30/+60 min, end −30/0 min
+
+  const turno    = turniConfig[0];
+  const baseStart = document.getElementById('store-open')?.value  || (turno ? turno.start : '09:30');
+  const baseEnd   = document.getElementById('store-close')?.value || (turno ? turno.end   : '20:00');
+  const MIN_SHIFT_H = 5.5;
+
+  // start offsets [0,30,60,90] × end offsets [-60,-30,0] = 12 variants per day.
+  // -60/-30 exposed to openers (all days) and last-day picker for fine-grained hour matching.
+  // -60 min variant lets sole-reparto openers pick a 7h shift instead of always 7.5h.
+  const startOffs  = [0, 30, 60, 90];
+  const endOffs    = [-60, -30, 0];
+  const morningEnd = lunchBreakStart; // massima copertura mattina fino all'inizio pausa
+  const allVariants = [];
+  for (const so of startOffs) for (const eo of endOffs) {
+    const s = addMinutes(baseStart, so), e = addMinutes(baseEnd, eo);
+    const h = shiftHours({ start: s, end: e });
+    if (h >= MIN_SHIFT_H) allVariants.push({ start: s, end: e, hours: h });
+  }
+
+  // Full working days per employee (excludes rest, half-day, manual-locked)
+  const empFullDayList = {};
+  employees.forEach(emp => {
+    empFullDayList[emp.id] = dates
+      .filter(d => {
+        const dk = fmt(d);
+        return empNeedsWork(emp, d) && planWork[emp.id][dk]
+            && halfDayDate[emp.id] !== dk && !isManualLocked(emp.id, dk);
+      })
+      .map(d => fmt(d));
+  });
+
+  // Per-employee target hours per full shift so weekly total equals emp.ore
+  const targetDayH = {};
+  employees.forEach(emp => {
+    const halfH = halfDayConf[emp.id] ? shiftHours(halfDayConf[emp.id]) : 0;
+    const n = empFullDayList[emp.id].length;
+    targetDayH[emp.id] = n > 0 ? (emp.ore - halfH) / n : (turno ? shiftHours(turno) : 8);
+  });
+
+  // Detect employees whose LAST full working day is sole-dept (will be forced to full shift).
+  // Used to reserve avgShiftH for that day and pre-reduce targets on earlier days.
+  const lastDaySoloDept = {};
+  employees.forEach(emp => {
+    const dayList = empFullDayList[emp.id];
+    if (dayList.length < 2) return;
+    const lastDk = dayList[dayList.length - 1];
+    const rId = dayAssignment[lastDk]?.[emp.id] || '';
+    if (!rId) return;
+    lastDaySoloDept[emp.id] = employees.filter(e =>
+      e.id !== emp.id &&
+      empFullDayList[e.id].includes(lastDk) &&
+      dayAssignment[lastDk]?.[e.id] === rId
+    ).length === 0;
+  });
+
+  // Opener (must start at store-open) and closer (must end at store-close) per day/reparto.
+  // Rotated by weekNum+dayOfWeek so the same employee doesn't always open or close.
+  const openerOf = {}, closerOf = {};
+  dates.forEach(d => {
+    if (!needsCoverage(d)) return;
+    const dk = fmt(d);
+    openerOf[dk] = {}; closerOf[dk] = {};
+    reparti.forEach(rep => {
+      if (d.getDay() === 0 && rep.chiusoDomenica) return;
+      const workers = employees.filter(emp =>
+        planWork[emp.id][dk] &&
+        dayAssignment[dk]?.[emp.id] === rep.id &&
+        halfDayDate[emp.id] !== dk && !isManualLocked(emp.id, dk)
+      );
+      if (!workers.length) return;
+      const opIdx = (weekNum + d.getDay()) % workers.length;
+      // Closer is the worker "one step back" in rotation to maximise opener/closer separation
+      const clIdx = workers.length === 1 ? opIdx : (opIdx + workers.length - 1) % workers.length;
+      openerOf[dk][rep.id] = workers[opIdx].id;
+      closerOf[dk][rep.id] = workers[clIdx].id;
+    });
+  });
+
+  // Assign best shift variant per (day, employee).
+  // Process dates in order so remaining-hours tracking is accurate day by day.
+  const shiftVariant = {}; // dk → empId → {start, end, hours}
+  const cumulH = {};
+  employees.forEach(emp => { cumulH[emp.id] = 0; });
+
+  dates.forEach(d => {
+    if (!needsCoverage(d)) return;
+    const dk = fmt(d);
+    shiftVariant[dk] = {};
+    const dayBaseSt = d.getDay() === 0 ? domenicaApertura : baseStart;
+
+    employees.forEach(emp => {
+      if (!empFullDayList[emp.id].includes(dk)) return;
+
+      const rId      = dayAssignment[dk]?.[emp.id] || empReparti(emp)[0] || '';
+      // When a dept has only 1 worker, opener=closer=same person.
+      // Always force the opener constraint (start at baseStart) to guarantee morning opening.
+      // Relax the closer constraint instead — flexible end time lets hour-tracking avoid accumulation.
+      const isOpener = openerOf[dk]?.[rId] === emp.id;
+      const isCloser = closerOf[dk]?.[rId] === emp.id
+                    && openerOf[dk]?.[rId] !== closerOf[dk]?.[rId];
+
+      // Recalculate today's target using remaining hours and remaining days
+      const remaining = empFullDayList[emp.id].filter(dk2 => dk2 >= dk).length;
+      const halfH     = halfDayConf[emp.id] ? shiftHours(halfDayConf[emp.id]) : 0;
+      const hoursLeft = Math.max(0, emp.ore - halfH - cumulH[emp.id]);
+      // If last day is sole-dept (forced full shift), reserve avgShiftH for it so prior
+      // days target lower hours — employee hits exactly emp.ore with no overshoot.
+      const isLastDay = remaining === 1;
+      let todayTgt;
+      if (!isLastDay && lastDaySoloDept[emp.id]) {
+        const otherTgt = (hoursLeft - avgShiftH) / (remaining - 1);
+        todayTgt = otherTgt >= MIN_SHIFT_H ? otherTgt : hoursLeft / remaining;
+      } else {
+        todayTgt = remaining > 0 ? hoursLeft / remaining : targetDayH[emp.id];
+      }
+
+      // Solo in dept: no other full-day co-worker → cannot shift entry or exit
+      const isSoloDept = rId && employees.filter(e =>
+        e.id !== emp.id &&
+        empFullDayList[e.id].includes(dk) &&
+        dayAssignment[dk]?.[e.id] === rId
+      ).length === 0;
+
+      // Turno corto quando l'obiettivo giornaliero scende sotto la durata minima piena.
+      // Le mezze giornate si fanno di POMERIGGIO; chi apre il reparto (o è l'unico
+      // presente) resta sulla mattina, altrimenti il negozio non aprirebbe.
+      const needShort     = todayTgt < MIN_SHIFT_H;
+      const shortPomeriggio = needShort && !!pomeriggioConf && !isOpener && !isSoloDept;
+      const forceMorning  = needShort && !shortPomeriggio;
+      const minH = needShort ? 1.5 : MIN_SHIFT_H;
+
+      const validSt = shortPomeriggio ? [pomeriggioConf.start]
+                    : (isOpener || isSoloDept) ? [dayBaseSt] : startOffs.map(o => addMinutes(dayBaseSt, o));
+      // Bug C fix: isSoloDept locks end ONLY on last day or when a full shift is still needed.
+      // On intermediate days with hoursLeft < avgShiftH, allow end-offset granularity so
+      // dynamic hours-targeting can hit emp.ore exactly. Opener constraint (validSt) is unaffected.
+      const validEn = shortPomeriggio ? [pomeriggioConf.end]
+                    : forceMorning ? [morningEnd]
+                    : isCloser ? [baseEnd]
+                    : (isSoloDept && (isLastDay || hoursLeft >= avgShiftH)) ? [baseEnd]
+                    : (isLastDay || isOpener || isSoloDept) ? [-60, -30, 0].map(o => addMinutes(baseEnd, o))
+                    : [baseEnd];
+
+      let best = null, bestDiff = Infinity;
+      for (const s of validSt) for (const e of validEn) {
+        const h = shiftHours({ start: s, end: e });
+        if (h < minH) continue;
+        // isSoloDept: sole dept worker must cover until store close even if slightly over hours
+        if (isLastDay && !isSoloDept && h > hoursLeft + 0.51) continue;
+        const diff = Math.abs(h - todayTgt);
+        if (diff < bestDiff || (diff === bestDiff && h < (best?.hours ?? Infinity))) {
+          bestDiff = diff; best = { start: s, end: e, hours: h };
+        }
+      }
+      // Tier 1: short fallback only when hoursLeft is below the full-shift minimum.
+      // Prova PRIMA il pomeriggio (le mezze giornate si fanno di pomeriggio); la mattina
+      // resta il ripiego, ed è l'unica opzione per chi apre o è solo nel reparto.
+      if (!best && isLastDay && hoursLeft < MIN_SHIFT_H) {
+        if (!isOpener && !isSoloDept && pomeriggioConf) {
+          const pomH = shiftHours(pomeriggioConf);
+          if (pomH >= 1.5 && pomH <= hoursLeft + 0.51) {
+            best = { start: pomeriggioConf.start, end: pomeriggioConf.end, hours: pomH };
+          }
+        }
+        if (!best) {
+          const morStarts = isOpener ? [dayBaseSt] : startOffs.map(o => addMinutes(dayBaseSt, o));
+          for (const s of morStarts) {
+            const h = shiftHours({ start: s, end: morningEnd });
+            if (h < 1.5 || h > hoursLeft + 0.51) continue;
+            if (!best || h > best.hours) best = { start: s, end: morningEnd, hours: h };
+          }
+        }
+      }
+      // Tier 2: relax overshoot entirely — pick smallest variant to minimise OT.
+      if (!best) {
+        for (const s of validSt) for (const e of validEn) {
+          const h = shiftHours({ start: s, end: e });
+          if (h < minH) continue;
+          if (!best || h < best.hours) best = { start: s, end: e, hours: h };
+        }
+      }
+      if (!best) best = { start: dayBaseSt, end: baseEnd, hours: shiftHours(turno) };
+
+      shiftVariant[dk][emp.id] = best;
+      cumulH[emp.id] += best.hours;
+    });
+  });
+
+  // ── PHASE 3: apply shifts ──────────────────────────────────────────────────
+
+  employees.forEach(emp => {
+    dates.forEach(d => {
+      const dk = fmt(d);
+      if (isManualLocked(emp.id, dk)) return;
+
+      if (!planWork[emp.id][dk]) {
+        setShift(emp.id, dk, 'riposo', null, null, null, null, null);
+      } else if (halfDayDate[emp.id] === dk) {
+        // Mezza giornata: apply half-day shift type for this employee
+        const hConf  = halfDayConf[emp.id];
+        const rId    = dayAssignment[dk]?.[emp.id] || empReparti(emp)[0] || '';
+        // Sunday mattina starts at domenicaApertura (store opens later)
+        const hStart = (d.getDay() === 0 && hConf.id === 'mattina') ? domenicaApertura : hConf.start;
+        setShift(emp.id, dk, hConf.id, hConf.label, hStart, hConf.end, 'Mezza giornata', rId);
+      } else {
+        const rId = dayAssignment[dk]?.[emp.id] || empReparti(emp)[0] || '';
+        const sv  = shiftVariant[dk]?.[emp.id];
+        const st  = sv ? sv.start : (d.getDay() === 0 ? domenicaApertura : baseStart);
+        const et  = sv ? sv.end   : baseEnd;
+        // Turni corti del fallback Phase 2.5: etichettali come pomeriggio (o mattina se
+        // il dipendente doveva aprire). Phase 3c li riclassifica come intera se estesi.
+        const isShortPom = !!(sv && pomeriggioConf && sv.start === pomeriggioConf.start && sv.end === pomeriggioConf.end);
+        const isShortMat = !!(sv && sv.end === morningEnd);
+        const shortConf  = isShortPom ? pomeriggioConf : (isShortMat ? mattinaConf : null);
+        const sType  = shortConf ? shortConf.id    : (turno?.id    || 'intera');
+        const sLabel = shortConf ? shortConf.label : (turno?.label || 'Giornata Intera');
+        // Nota diversa dalla mezza giornata settimanale: è solo un turno accorciato per
+        // far quadrare il monte ore, non va contato come seconda mezza giornata.
+        setShift(emp.id, dk, sType, sLabel, st, et, (isShortPom || isShortMat) ? 'Turno ridotto' : null, rId);
+      }
+    });
+  });
+
+  // ── PHASE 3b: coverage repair — fill uncovered slots ─
+
+  // Helper: count employees actually assigned to a specific reparto on a given day
+  // C29-COV-SLOT: usa presenza simultanea (min mattina/pomeriggio) invece di headcount
+  const getRepWorking = (rId, dk) => repSlotCoverage(rId, dk);
+
+  // Iterate dates as outer loop so all reparti on the same day see a consistent, updated schedule
+  dates.forEach(d => {
+    if (!needsCoverage(d)) return;
+    const dk = fmt(d);
+
+    // EDGE-02 (loop finiteness): Pass 1 and Pass 2 below are both single-pass bounded loops.
+    // Pass 1 uses `candidates.slice(0, needed).forEach` — slice of an empty filtered array is
+    // empty, so when the Bug B hours-guard rejects every rest-day employee (all at 40h),
+    // the forEach body simply never runs. `needed` is never re-evaluated inside Pass 1;
+    // execution falls through to Pass 2 with the same dk. Pass 2 uses `for (const emp of
+    // reassignCandidates)` with an explicit `if (needed <= 0) break` and a single decrement of
+    // `needed` per successful reassignment, bounded by `reassignCandidates.length` ≤
+    // `employees.length`. Genuine unfillable gaps (e.g. all-absent dept, or all candidates
+    // already at contract hours) leave `needed > 0` at exit and surface via the coverageIssues
+    // check at lines ~1956-1970 — the correct behavior. No retry loop, no infinite path.
+    // Pass 1: promote resting employees as straordinari to fill gaps
+    reparti.forEach(rep => {
+      if (d.getDay() === 0 && rep.chiusoDomenica) return;
+      let needed = rep.minCopertura - getRepWorking(rep.id, dk);
+      if (needed <= 0) return;
+
+      const candidates = employees
+        .filter(emp => {
+          if (isManualLocked(emp.id, dk)) return false;
+          const s = (schedule[emp.id] || {})[dk];
+          if (!s || s.type !== 'riposo' || !empReparti(emp).includes(rep.id)) return false;
+          // Bug B fix: only promote rest-day employees who haven't reached contract hours yet.
+          // 0.1h tolerance matches the float-rounding precision used elsewhere (Math.round(x*10)/10).
+          // Promoting a 40h employee would add 8h on top (violating ALG-01) and remove their last
+          // rest day (violating ALG-02). When no candidate qualifies, the gap is left and surfaces
+          // via the coverageIssues toast — the correct behavior (data-entry problem, not algorithm).
+          return calcWeekHours(emp.id) < emp.ore - 0.1;
+        })
+        .sort((a, b) => calcWeekHours(a.id) - calcWeekHours(b.id));
+
+      candidates.slice(0, needed).forEach(emp => {
+        // C29-OT0: calcola ore rimanenti; salta se < turno minimo per non sforare contratto
+        const remaining = Math.round((emp.ore - calcWeekHours(emp.id)) * 10) / 10;
+        if (remaining < MIN_SHIFT_H) return;
+        const startTime = d.getDay() === 0 ? domenicaApertura : baseStart;
+        let endTime = baseEnd;
+        // Riduci endTime a passi di 30 min per stare entro remaining (tolleranza 0.05h)
+        while (shiftHours({ start: startTime, end: endTime }) > remaining + 0.05) {
+          const nextEnd = addMinutes(endTime, -30);
+          if (shiftHours({ start: startTime, end: nextEnd }) < MIN_SHIFT_H) break;
+          endTime = nextEnd;
+        }
+        setShift(emp.id, dk, turno.id, turno.label, startTime, endTime, null, rep.id);
+      });
+    });
+
+    // Pass 2: reassign employees working in over-staffed reparti to fill remaining gaps
+    reparti.forEach(rep => {
+      if (d.getDay() === 0 && rep.chiusoDomenica) return;
+      let needed = rep.minCopertura - getRepWorking(rep.id, dk);
+      if (needed <= 0) return;
+
+      const reassignCandidates = employees.filter(emp => {
+        if (isManualLocked(emp.id, dk)) return false;
+        const s = (schedule[emp.id] || {})[dk];
+        if (!s || ['riposo','malattia','ferie','permesso'].includes(s.type)) return false;
+        if (s.reparto === rep.id) return false;
+        if (!empReparti(emp).includes(rep.id)) return false;
+        // Only reassign if the source reparto still keeps its minimum coverage
+        const fromRepId = s.reparto;
+        if (!fromRepId) return true;
+        const fromRep = reparti.find(r => r.id === fromRepId);
+        if (!fromRep) return true;
+        return getRepWorking(fromRepId, dk) - 1 >= fromRep.minCopertura;
+      });
+
+      for (const emp of reassignCandidates) {
+        if (needed <= 0) break;
+        const s = (schedule[emp.id] || {})[dk];
+        if (!s || ['riposo','malattia','ferie','permesso'].includes(s.type)) continue;
+        const fromRepId = s.reparto;
+        if (fromRepId) {
+          const fromRep = reparti.find(r => r.id === fromRepId);
+          if (fromRep && getRepWorking(fromRepId, dk) - 1 < fromRep.minCopertura) continue;
+        }
+        setShift(emp.id, dk, s.type, s.label, s.start, s.end, s.note, rep.id);
+        needed--;
+      }
+    });
+  });
+
+  // Coverage check using actual shift assignments
+  const coverageIssues = [];
+  dates.forEach(d => {
+    if (!needsCoverage(d)) return;
+    const dk = fmt(d);
+    reparti.forEach(rep => {
+      if (d.getDay() === 0 && rep.chiusoDomenica) return;
+      const working = repSlotCoverage(rep.id, dk); // C29-COV-SLOT: presenza simultanea
+      if (working < rep.minCopertura) {
+        coverageIssues.push(`${dayName(d)} – ${rep.nome}: ${working}/${rep.minCopertura}`);
+      }
+    });
+  });
+
+  // ── PHASE 3c: garantisce monteo ore — estende l'ultimo turno se ancora corto ─
+  employees.forEach(emp => {
+    const totalH  = calcWeekHours(emp.id);
+    let shortfall = Math.round((emp.ore - totalH) * 10) / 10;
+    if (shortfall < 0.25) return; // entro 15 min: OK
+
+    // Giorni lavorativi estendibili: non riposo/assenze, non la vera mezza giornata designata,
+    // non manuali. Mattina/pomeriggio forzate su giorno pieno (fallback Phase 2.5) sono incluse.
+    const extendable = dates
+      .slice().reverse()
+      .filter(d => {
+        const dk = fmt(d);
+        const s  = (schedule[emp.id] || {})[dk];
+        return s && !['riposo','malattia','ferie','permesso'].includes(s.type)
+            && halfDayDate[emp.id] !== dk   // esclude solo la vera mezza giornata
+            && !isManualLocked(emp.id, dk) && s.end;
+      });
+
+    for (const d of extendable) {
+      if (shortfall < 0.25) break;
+      const dk = fmt(d);
+      const s  = schedule[emp.id][dk];
+      const lbStartH = parseHour(lunchBreakStart);
+      const lbEndH   = parseHour(lunchBreakEnd);
+      while (shortfall >= 0.25) {
+        const newEnd  = addMinutes(s.end, 30);
+        const newEndH = parseHour(newEnd);
+
+        // Turno già alla chiusura: se è pomeridiano anticipiamo l'inizio (min: fine pausa)
+        if (newEndH > parseHour(baseEnd)) {
+          const newStart  = addMinutes(s.start, -30);
+          const newStartH = parseHour(newStart);
+          if (newStartH >= lbEndH) {
+            s.start   = newStart;
+            shortfall = Math.round((emp.ore - calcWeekHours(emp.id)) * 10) / 10;
+            continue;
+          }
+          break;
+        }
+
+        // Fine dentro la pausa pranzo: prima prova ad anticipare l'inizio (ore mattina)
+        if (newEndH > lbStartH && newEndH < lbEndH) {
+          const newStart  = addMinutes(s.start, -30);
+          const newStartH = parseHour(newStart);
+          const dayOpen   = d.getDay() === 0 ? domenicaApertura : baseStart;
+          if (newStartH >= parseHour(dayOpen)) {
+            s.start   = newStart;
+            shortfall = Math.round((emp.ore - calcWeekHours(emp.id)) * 10) / 10;
+            continue;
+          }
+          // Inizio già all'apertura: salta al primo slot del pomeriggio e continua ad estendere
+          s.end     = addMinutes(lunchBreakEnd, 30);
+          shortfall = Math.round((emp.ore - calcWeekHours(emp.id)) * 10) / 10;
+          continue;
+        }
+
+        s.end     = newEnd;
+        shortfall = Math.round((emp.ore - calcWeekHours(emp.id)) * 10) / 10;
+      }
+      // Se un turno mattina/pomeriggio forzato (non la vera mezza giornata) è stato modificato,
+      // riclassificarlo come Giornata Intera per evitare di mostrare due mezze giornate.
+      if ((s.type === 'mattina' || s.type === 'pomeriggio') && turno) {
+        s.type  = turno.id;
+        s.label = turno.label;
+        s.note  = null;
+      }
+    }
+  });
+
+  // ── PHASE 4: ottimizzazione iterativa copertura a 0 straordinari ───────────
+  // Rimodella SOLO gli orari (inizio/fine/pausa) dei turni già assegnati per massimizzare
+  // la copertura simultanea mattina/pomeriggio senza MAI superare le ore contrattuali.
+  // Non tocca riposi/assenze/turni manuali → numero di riposi invariato.
+  optimizeCoverage();
+
+  // Ricalcola gli slot scoperti DOPO l'ottimizzazione (presenza simultanea per slot)
+  coverageIssues.length = 0;
+  dates.forEach(d => {
+    if (!needsCoverage(d)) return;
+    const dk = fmt(d);
+    reparti.forEach(rep => {
+      if (d.getDay() === 0 && rep.chiusoDomenica) return;
+      const working = repSlotCoverage(rep.id, dk);
+      if (working < rep.minCopertura) coverageIssues.push(`${dayName(d)} – ${rep.nome}: ${working}/${rep.minCopertura}`);
+      const oc = repOpenClose(rep.id, dk);
+      if (rep.minCopertura && oc.holes.length) coverageIssues.push(`${dayName(d)} – ${rep.nome}: reparto vuoto ${oc.holesTxt}`);
+    });
+  });
+
+  renderCalendar();
+  updateStats();
+  saveData();
+
+  if (coverageIssues.length) {
+    showToast(`⚠️ Copertura insufficiente in ${coverageIssues.length} slot. Aggiungi dipendenti.`, 'warn');
+  } else {
+    showToast('⚡ Turni generati! Tutti i reparti coperti.', 'success');
+  }
+
+  // Warn when employees can't reach their contracted hours (shift too short × available days)
+  const shortHours = employees.filter(emp => calcWeekHours(emp.id) < emp.ore - 0.5);
+  if (shortHours.length) {
+    const names = shortHours.map(e => `${e.nome} (${calcWeekHours(e.id)}h su ${e.ore}h)`).join(', ');
+    setTimeout(() => showToast(
+      `⚠️ Ore insufficienti: ${names}. Il turno "Giornata Intera" dura solo ${avgShiftH}h — verifica orari e pausa pranzo nel tab Turni.`,
+      'warn'
+    ), 600);
+  }
+
+  // Pre-execution feasibility warning: contract hours mathematically unreachable given available days.
+  // Fires AFTER the shortHours toast (1200ms delay) so the user reads them in order.
+  if (infeasibleEmps.length) {
+    const names = infeasibleEmps.map(e => {
+      const av = dates.filter(d => empNeedsWork(e, d) && !isManualLocked(e.id, fmt(d))).length;
+      return `${e.nome} (${av} giorni disponibili per ${e.ore}h)`;
+    }).join(', ');
+    setTimeout(() => showToast(
+      `⚠️ Ore non raggiungibili per: ${names}. Riduci le assenze o le ore contrattuali.`,
+      'warn'
+    ), 1200); // 1200ms so it appears AFTER the existing 600ms shortHours toast
+  }
+}
+
+// ==================== PHASE 4: COVERAGE OPTIMIZER ====================
+// Hill-climbing post-pass: reshapes only shift start/end/break of already-assigned work
+// cells to maximize simultaneous morning/afternoon coverage, with 0 overtime as a hard
+// constraint. Never changes who works/rests or department assignment (rest-day count fixed).
+// "Paired" moves cover a gap on one day while trimming another day of the SAME employee so
+// their weekly total stays at contract (no overtime). Incremental delta scoring keeps it <1s.
+function optimizeCoverage() {
+  if (!employees.length || !reparti.length || !turniConfig.length) return;
+  const dates = getWeekDates();
+  const lsh = parseHour(lunchBreakStart), leh = parseHour(lunchBreakEnd);
+  const turno = turniConfig[0];
+  const baseStart = (document.getElementById('store-open')?.value)  || turno.start;
+  const baseEnd   = (document.getElementById('store-close')?.value) || turno.end;
+  const dayOpen = (d) => d.getDay() === 0 ? domenicaApertura : baseStart;
+  const ABS = (t) => ['riposo','malattia','ferie','permesso'].includes(t);
+  const WORK = (s) => s && s.start && s.end && !ABS(s.type);
+  const empById = {}; employees.forEach(e => empById[e.id] = e);
+  const repById = {}; reparti.forEach(r => repById[r.id] = r);
+  // Copertura usata dall'ottimizzatore = ESATTAMENTE quella mostrata in tabella (repSlotCoverage:
+  // min tra presenti mattina e presenti pomeriggio). Allinea l'obiettivo a ciò che vede l'utente
+  // e legge il reparto corrente di ogni cella → le mosse di riassegnamento sono valutate bene.
+  const covStrict = (rId, dk) => repSlotCoverage(rId, dk);
+  // Buco = persone mancanti + ogni mezz'ora con reparto VUOTO (apertura, riapertura dopo pranzo,
+  // chiusura comprese). Stesso peso: requisito critico, e la granularità a mezz'ore guida le mosse.
+  function gapAt(rId, dk) {
+    const rep = repById[rId]; if (!rep) return 0;
+    if (!rep.minCopertura) return 0;
+    return Math.max(0, rep.minCopertura - covStrict(rId, dk)) + repOpenClose(rId, dk).holes.length;
+  }
+  function ouFromH(eid, h) { const e = empById[eid]; return 100000 * Math.max(0, h - e.ore) + 100 * Math.max(0, e.ore - h); }
+  // Turni "brutti": un tratto (mattina o pomeriggio) sotto MIN_SEG_H, es. 10:00-16:00 = mezz'ora
+  // dopo pranzo. Penalità < 0,5h di ore mancanti (50) → mai sacrificare ore o copertura per l'estetica,
+  // ma a parità si preferisce sempre il turno con tratti pieni.
+  const MIN_SEG_H = 2, UGLY_W = 40;
+  function uglySegs(s) {
+    const st = parseHour(s.start), en = parseHour(s.end);
+    const segs = s.breakStart ? [parseHour(s.breakStart) - st, en - parseHour(s.breakEnd)]
+               : (st < lsh && en > leh) ? [lsh - st, en - leh] : [en - st];
+    return segs.filter(x => x < MIN_SEG_H - 0.01).length;
+  }
+  function shapesFor(d) {
+    const open = dayOpen(d); const out = [];
+    const starts = [open, addMinutes(open, 30), addMinutes(open, 60), addMinutes(open, 90)];
+    const ends   = [baseEnd, addMinutes(baseEnd, -30), addMinutes(baseEnd, -60)];
+    for (const st of starts) for (const en of ends) { const h = shiftHours({ start: st, end: en }); if (h >= 5.5) out.push({ start: st, end: en, h }); }
+    // Nessuna forma "solo mattina": le mezze giornate devono restare pomeridiane,
+    // quindi l'ottimizzatore può accorciare un turno solo sulla fascia del pomeriggio.
+    const aSt = [lunchBreakEnd, addMinutes(lunchBreakEnd, 30), addMinutes(lunchBreakEnd, 60), addMinutes(lunchBreakEnd, 90)];
+    for (const st of aSt) { const h = shiftHours({ start: st, end: baseEnd }); if (h >= 1.5) out.push({ start: st, end: baseEnd, h }); }
+    for (const bE of [addMinutes(lunchBreakEnd, 30), addMinutes(lunchBreakEnd, 60), addMinutes(lunchBreakEnd, 90)]) {
+      const sh = { start: open, end: baseEnd, breakStart: lunchBreakStart, breakEnd: bE }; sh.h = shiftHours(sh);
+      if (sh.h >= 5.5) out.push(sh);
+    }
+    // Forme corte per chi APRE (le mezze giornate restano pomeridiane, ma chi apre non può
+    // entrare alle 15:30): solo mattina dall'apertura, oppure apertura → uscita anticipata nel pomeriggio.
+    out.push({ start: open, end: lunchBreakStart, h: shiftHours({ start: open, end: lunchBreakStart }) });
+    for (let en = addMinutes(lunchBreakEnd, MIN_SEG_H * 60); parseHour(en) < parseHour(baseEnd) - 1.01; en = addMinutes(en, 30)) {
+      out.push({ start: open, end: en, h: shiftHours({ start: open, end: en }) });
+    }
+    // L'ottimizzatore non propone mai forme con tratti corti (es. domenica 11:30-13:00)
+    return out.filter(sh => uglySegs(sh) === 0).map(sh => (sh.ug = 0, sh));
+  }
+  const cells = [];
+  employees.forEach(e => dates.forEach(d => {
+    const dk = fmt(d); const s = (schedule[e.id] || {})[dk];
+    if (WORK(s) && !s.manual) cells.push({ eid: e.id, dk, d, rep: s.reparto });
+  }));
+  const shapeCache = {}; const shapesD = (d) => shapeCache[d.getDay()] || (shapeCache[d.getDay()] = shapesFor(d));
+  const snap = (eid, dk) => { const s = schedule[eid][dk]; return { start: s.start, end: s.end, breakStart: s.breakStart, breakEnd: s.breakEnd }; };
+  const setS = (eid, dk, sh) => { const s = schedule[eid][dk]; s.start = sh.start; s.end = sh.end; s.breakStart = sh.breakStart; s.breakEnd = sh.breakEnd; };
+  const hNow = (eid, dk) => shiftHours(schedule[eid][dk]);
+  const empH = {};
+  function resetEmpH() { employees.forEach(e => { let t = 0; dates.forEach(d => { const s = (schedule[e.id] || {})[fmt(d)]; if (WORK(s)) t += shiftHours(s); }); empH[e.id] = Math.round(t * 10) / 10; }); }
+  // snapshot/restore delle sole celle di lavoro modificabili (orari + reparto)
+  function snapshotState() { return cells.map(c => { const s = schedule[c.eid][c.dk]; return { start: s.start, end: s.end, breakStart: s.breakStart, breakEnd: s.breakEnd, reparto: s.reparto }; }); }
+  function restoreState(snp) { cells.forEach((c, i) => { const s = schedule[c.eid][c.dk]; const v = snp[i]; s.start = v.start; s.end = v.end; s.breakStart = v.breakStart; s.breakEnd = v.breakEnd; s.reparto = v.reparto; c.rep = v.reparto; }); }
+  function totalGaps() { let g = 0; reparti.forEach(rep => dates.forEach(d => { const dow = d.getDay(); if (dow === 0 && !domenicaAperto) return; if (dow === 0 && rep.chiusoDomenica) return; g += gapAt(rep.id, fmt(d)); })); return g; }
+  function totalOT() { let ot = 0; employees.forEach(e => { let h = 0; dates.forEach(d => { const s = (schedule[e.id] || {})[fmt(d)]; if (WORK(s)) h += shiftHours(s); }); ot += Math.max(0, Math.round((h - e.ore) * 10) / 10); }); return ot; }
+
+  // Un giro completo di hill-climbing. allowReassign abilita le mosse di riassegnamento reparto.
+  function runHillClimb(allowReassign) {
+    resetEmpH();
+    const t0 = Date.now(); const TIME_BUDGET = 4000;
+    for (let iter = 0; iter < 600; iter++) {
+    if (Date.now() - t0 > TIME_BUDGET) break;
+    let bestDelta = -1e-9, bestMove = null;
+    // --- mosse singole (rifila straordinari, sposta presenza a parità di ore) ---
+    for (const c of cells) {
+      const g0 = gapAt(c.rep, c.dk); const h0 = hNow(c.eid, c.dk); const ou0 = ouFromH(c.eid, empH[c.eid]);
+      const orig = snap(c.eid, c.dk); const ug0 = uglySegs(orig);
+      for (const sh of shapesD(c.d)) {
+        setS(c.eid, c.dk, sh);
+        const ouN = ouFromH(c.eid, Math.round((empH[c.eid] - h0 + sh.h) * 10) / 10);
+        const delta = 1000 * (gapAt(c.rep, c.dk) - g0) + (ouN - ou0) + UGLY_W * (sh.ug - ug0);
+        if (delta < bestDelta) { bestDelta = delta; bestMove = { t: 's', c1: c, a: sh }; }
+      }
+      setS(c.eid, c.dk, orig);
+    }
+    // --- mosse di riassegnamento reparto (neutre su ore): sposta una cella in un reparto
+    //     scoperto per cui il dipendente è qualificato, se l'origine non perde copertura ---
+    if (allowReassign) for (const c of cells) {
+      const alts = empReparti(empById[c.eid]).filter(r => r !== c.rep && repById[r]);
+      if (!alts.length) continue;
+      const g0from = gapAt(c.rep, c.dk);
+      const s = schedule[c.eid][c.dk]; const oldRep = s.reparto;
+      for (const R of alts) {
+        const g0to = gapAt(R, c.dk);
+        s.reparto = R;
+        const delta = 1000 * ((gapAt(oldRep, c.dk) - g0from) + (gapAt(R, c.dk) - g0to));
+        s.reparto = oldRep;
+        if (delta < bestDelta) { bestDelta = delta; bestMove = { t: 'r', c1: c, rep: R }; }
+      }
+    }
+    // --- mosse accoppiate: copri un buco + rifila un altro giorno dello STESSO dipendente ---
+    const gapList = [];
+    reparti.forEach(rep => dates.forEach(d => {
+      const dow = d.getDay(); if (dow === 0 && !domenicaAperto) return; if (dow === 0 && rep.chiusoDomenica) return;
+      const dk = fmt(d); if (gapAt(rep.id, dk) > 0) gapList.push({ repId: rep.id, dk });
+    }));
+    for (const g of gapList) {
+      const cand = cells.filter(c => c.dk === g.dk && c.rep === g.repId);
+      for (const c1 of cand) {
+        const others = cells.filter(c => c.eid === c1.eid && c.dk !== c1.dk);
+        const orig1 = snap(c1.eid, c1.dk); const h1o = hNow(c1.eid, c1.dk);
+        const g0a = gapAt(c1.rep, c1.dk); const ou0 = ouFromH(c1.eid, empH[c1.eid]); const ug1o = uglySegs(orig1);
+        for (const sh1 of shapesD(c1.d)) {
+          if (sh1.h - h1o <= 0.01) continue;           // solo forme che aggiungono capacità di copertura
+          setS(c1.eid, c1.dk, sh1);
+          const g1a = gapAt(c1.rep, c1.dk);
+          for (const c2 of others) {
+            const orig2 = snap(c2.eid, c2.dk); const h2o = hNow(c2.eid, c2.dk);
+            const g0b = gapAt(c2.rep, c2.dk); const ug2o = uglySegs(orig2);
+            for (const sh2 of shapesD(c2.d)) {
+              if (sh2.h > h2o - 0.01) continue;          // c2 dev'essere un taglio
+              if (Math.abs((sh1.h - h1o) + (sh2.h - h2o)) > 0.26) continue; // ore settimanali ~invariate
+              setS(c2.eid, c2.dk, sh2);
+              const ouN = ouFromH(c1.eid, Math.round((empH[c1.eid] - h1o + sh1.h - h2o + sh2.h) * 10) / 10);
+              const delta = 1000 * ((g1a - g0a) + (gapAt(c2.rep, c2.dk) - g0b)) + (ouN - ou0) + UGLY_W * (-ug1o - ug2o);
+              if (delta < bestDelta) { bestDelta = delta; bestMove = { t: 'p', c1, a: sh1, c2, b: sh2, h1o, h2o }; }
+              setS(c2.eid, c2.dk, orig2);
+            }
+          }
+          setS(c1.eid, c1.dk, orig1);
+        }
+        setS(c1.eid, c1.dk, orig1);
+      }
+    }
+    // --- mosse accoppiate "estetiche": un turno con tratto corto (es. 10:00-16:00) prende una
+    //     forma piena e un altro giorno dello STESSO dipendente compensa le ore (±15 min) ---
+    for (const c1 of cells) {
+      const orig1 = snap(c1.eid, c1.dk); const ug1o = uglySegs(orig1);
+      if (!ug1o) continue;
+      const h1o = hNow(c1.eid, c1.dk); const g0a = gapAt(c1.rep, c1.dk); const ou0 = ouFromH(c1.eid, empH[c1.eid]);
+      const others = cells.filter(c => c.eid === c1.eid && c.dk !== c1.dk);
+      for (const sh1 of shapesD(c1.d)) {
+        setS(c1.eid, c1.dk, sh1);
+        const g1a = gapAt(c1.rep, c1.dk);
+        for (const c2 of others) {
+          const orig2 = snap(c2.eid, c2.dk); const h2o = hNow(c2.eid, c2.dk);
+          const g0b = gapAt(c2.rep, c2.dk); const ug2o = uglySegs(orig2);
+          for (const sh2 of shapesD(c2.d)) {
+            if (Math.abs((sh1.h - h1o) + (sh2.h - h2o)) > 0.26) continue;
+            setS(c2.eid, c2.dk, sh2);
+            const ouN = ouFromH(c1.eid, Math.round((empH[c1.eid] - h1o + sh1.h - h2o + sh2.h) * 10) / 10);
+            const delta = 1000 * ((gapAt(c1.rep, c1.dk) - g0a) + (gapAt(c2.rep, c2.dk) - g0b)) + (ouN - ou0) + UGLY_W * (-ug1o - ug2o);
+            if (delta < bestDelta) { bestDelta = delta; bestMove = { t: 'p', c1, a: sh1, c2, b: sh2, h1o, h2o }; }
+            setS(c2.eid, c2.dk, orig2);
+          }
+        }
+        setS(c1.eid, c1.dk, orig1);
+      }
+    }
+    // --- mosse multi-giorno: copri un buco allungando un turno di molte ore (es. dipendente solo
+    //     in reparto che deve aprire E chiudere) e ridistribuisci il taglio su PIÙ altri giorni dello
+    //     stesso dipendente; ogni taglio è ammesso solo se non peggiora buchi né crea tratti corti ---
+    for (const g of gapList) {
+      for (const c1 of cells.filter(c => c.dk === g.dk && c.rep === g.repId)) {
+        const orig1 = snap(c1.eid, c1.dk); const h1o = hNow(c1.eid, c1.dk);
+        const g0a = gapAt(c1.rep, c1.dk); const ug1o = uglySegs(orig1);
+        const ou0 = ouFromH(c1.eid, empH[c1.eid]);
+        const others = cells.filter(c => c.eid === c1.eid && c.dk !== c1.dk);
+        for (const sh1 of shapesD(c1.d)) {
+          const need = sh1.h - h1o;
+          if (need <= 0.26) continue;                  // i casi piccoli li gestiscono le mosse accoppiate
+          setS(c1.eid, c1.dk, sh1);
+          const g1a = gapAt(c1.rep, c1.dk);
+          if (g1a >= g0a) { setS(c1.eid, c1.dk, orig1); continue; }
+          let left = need, gapD = g1a - g0a, ugD = sh1.ug - ug1o; const changes = [];
+          for (const c2 of others) {
+            if (left <= 0.25) break;
+            const orig2 = snap(c2.eid, c2.dk); const h2o = hNow(c2.eid, c2.dk);
+            const g0b = gapAt(c2.rep, c2.dk); const ug2o = uglySegs(orig2);
+            let pick = null;
+            for (const sh2 of shapesD(c2.d)) {
+              const cut = h2o - sh2.h;
+              if (cut < 0.49 || cut > left + 0.25) continue;
+              setS(c2.eid, c2.dk, sh2);
+              const gb = gapAt(c2.rep, c2.dk) - g0b;
+              setS(c2.eid, c2.dk, orig2);
+              if (gb > 0) continue;
+              if (!pick || cut > pick.cut || (cut === pick.cut && gb < pick.gb)) pick = { sh2, cut, gb, ug: sh2.ug - ug2o };
+            }
+            if (!pick) continue;
+            setS(c2.eid, c2.dk, pick.sh2);                // applica provvisoriamente (i giorni sono distinti)
+            changes.push({ c: c2, sh: pick.sh2, orig: orig2, h0: h2o });
+            left -= pick.cut; gapD += pick.gb; ugD += pick.ug;
+          }
+          if (Math.abs(left) <= 0.25) {
+            const hN = Math.round((empH[c1.eid] + left) * 10) / 10;
+            const delta = 1000 * gapD + (ouFromH(c1.eid, hN) - ou0) + UGLY_W * ugD;
+            if (delta < bestDelta) {
+              bestDelta = delta;
+              bestMove = { t: 'm', c1, a: sh1, h1o, changes: changes.map(x => ({ c: x.c, sh: x.sh, h0: x.h0 })) };
+            }
+          }
+          for (let i = changes.length - 1; i >= 0; i--) setS(changes[i].c.eid, changes[i].c.dk, changes[i].orig);
+          setS(c1.eid, c1.dk, orig1);
+        }
+      }
+    }
+    if (!bestMove) break;
+    if (bestMove.t === 's') {
+      const c = bestMove.c1; const h0 = hNow(c.eid, c.dk);
+      setS(c.eid, c.dk, bestMove.a); empH[c.eid] = Math.round((empH[c.eid] - h0 + bestMove.a.h) * 10) / 10;
+    } else if (bestMove.t === 'm') {
+      const { c1, a, h1o, changes } = bestMove;
+      setS(c1.eid, c1.dk, a); let h = empH[c1.eid] - h1o + a.h;
+      changes.forEach(x => { setS(x.c.eid, x.c.dk, x.sh); h += x.sh.h - x.h0; });
+      empH[c1.eid] = Math.round(h * 10) / 10;
+    } else if (bestMove.t === 'r') {
+      const c = bestMove.c1; schedule[c.eid][c.dk].reparto = bestMove.rep; c.rep = bestMove.rep; // neutro su ore
+    } else {
+      const { c1, c2, a, b, h1o, h2o } = bestMove;
+      setS(c1.eid, c1.dk, a); setS(c2.eid, c2.dk, b);
+      empH[c1.eid] = Math.round((empH[c1.eid] - h1o + a.h - h2o + b.h) * 10) / 10;
+    }
+    } // fine for-iter
+  } // fine runHillClimb
+
+  // Esegue DUE varianti e tiene la migliore (mai peggio della sola ottimizzazione oraria):
+  //  A = solo orari ; B = orari + riassegnamento reparto. Entrambe a 0 straordinari.
+  const baseSnap = snapshotState();
+  const totalUgly = () => cells.reduce((n, c) => n + uglySegs(schedule[c.eid][c.dk]), 0);
+  runHillClimb(false); const scoreA = totalGaps() * 1000 + totalOT() + totalUgly() * 0.01; const snapA = snapshotState();
+  restoreState(baseSnap);
+  runHillClimb(true);  const scoreB = totalGaps() * 1000 + totalOT() + totalUgly() * 0.01;
+  if (scoreA <= scoreB) restoreState(snapA);   // parità → variante A (più stabile)
+
+  // Rietichetta le celle rimodellate così UI/Excel mostrano il tipo corretto
+  const mattinaC = turniConfig.find(t => t.id === 'mattina'), pomC = turniConfig.find(t => t.id === 'pomeriggio');
+  employees.forEach(e => dates.forEach(d => {
+    const dk = fmt(d); const s = (schedule[e.id] || {})[dk]; if (!WORK(s) || s.manual) return;
+    const st = parseHour(s.start), en = parseHour(s.end);
+    if (en <= lsh + 0.01) { if (mattinaC) { s.type = mattinaC.id; s.label = mattinaC.label; } }
+    else if (st >= leh - 0.01) { if (pomC) { s.type = pomC.id; s.label = pomC.label; } }
+    else { s.type = turno.id; s.label = turno.label; if (s.note === 'Mezza giornata') s.note = null; }
+  }));
+}
+
+function setShift(empId, date, type, label, start, end, note, rId, manual = false, extra = null) {
+  if (!schedule[empId]) schedule[empId] = {};
+  const base = manual ? { manual: true } : {};
+  if (type === 'riposo' || isAbsence(type)) {
+    schedule[empId][date] = { ...base, type, label: label || type.charAt(0).toUpperCase()+type.slice(1), start: null, end: null, note };
+  } else {
+    // extra può contenere breakStart/breakEnd per i turni spezzati (mattina+pomeriggio)
+    schedule[empId][date] = { ...base, type, label, start, end, note, reparto: rId || null, ...(extra || {}) };
+  }
+}
+
+// ==================== RENDER CALENDAR ====================
+function renderCalendar() {
+  const container = document.getElementById('calendar-container');
+  if (!employees.length) {
+    container.innerHTML = `<div class="empty-state"><div class="icon">📅</div><h3>Nessun dipendente</h3><p>Aggiungi reparti e dipendenti dalla sidebar per iniziare</p></div>`;
+    updateStats();
+    return;
+  }
+
+  const dates = getWeekDates();
+  const today = fmt(new Date());
+
+  let html = `<div class="cal-grid">`;
+
+  // Header row
+  html += `<div class="cal-header" style="background:var(--bg)">Dipendente</div>`;
+  dates.forEach(d => {
+    const isToday = fmt(d) === today;
+    html += `<div class="cal-header${isToday ? ' today' : ''}">
+      ${dayName(d)}<br>
+      <span style="font-size:14px;font-weight:700;color:var(--text)">${d.getDate()}</span>
+    </div>`;
+  });
+
+  // Employee rows
+  employees.forEach(emp => {
+    const weekHours = calcWeekHours(emp.id);
+    const oreColor  = weekHours > emp.ore ? '#ff6584' : weekHours >= emp.ore * 0.9 ? '#43e97b' : '#ffb347';
+    const depsLabel = empReparti(emp).map(rId => reparti.find(r => r.id === rId)?.nome).filter(Boolean).join(' / ');
+
+    html += `<div class="cal-emp-label" data-emprow="${emp.id}">
+      <div class="emp-dot" style="background:${emp.colore}"></div>
+      <div>
+        <div class="cal-emp-name">${emp.nome}</div>
+        ${depsLabel ? `<div class="cal-emp-dep">${depsLabel}</div>` : ''}
+        <div class="cal-emp-hours" style="color:${oreColor}">${weekHours}/${emp.ore}h</div>
+      </div>
+    </div>`;
+
+    dates.forEach(d => {
+      const dk = fmt(d);
+      const s  = (schedule[emp.id] || {})[dk];
+      html += `<div class="cal-cell" onclick="openShiftModal('${emp.id}','${dk}')">`;
+      if (s) {
+        const icon = getShiftIcon(s.type);
+        const cls  = s.cssClass || getShiftClass(s.type);
+        const hasCustomBreak = !!(s.breakStart && s.breakEnd);
+        const isSplit = s.start && s.end && (
+          hasCustomBreak ||
+          (parseHour(s.start) < parseHour(lunchBreakStart) && parseHour(s.end) > parseHour(lunchBreakEnd))
+        );
+        const brkS = hasCustomBreak ? s.breakStart : lunchBreakStart;
+        const brkE = hasCustomBreak ? s.breakEnd   : lunchBreakEnd;
+        const body = (s.type === 'riposo' || isAbsence(s.type))
+          ? `${icon} ${s.label}`
+          : isSplit
+            ? `${s.start}–${brkS}<br>${brkE}–${s.end}`
+            : `${s.start}–${s.end}`;
+        const assignedRep = s.reparto ? reparti.find(r => r.id === s.reparto) : null;
+        html += `<div class="shift-pill ${cls}" title="${s.note || s.manual ? (s.note || '') + (s.manual ? ' [bloccato manualmente]' : '') : ''}">
+          ${s.manual ? `<span class="shift-lock-badge" title="Bloccato: il generatore non modificherà questo turno">🔒</span>` : ''}
+          <div class="shift-time">${body}</div>
+          ${s.label && !isAbsence(s.type) && s.type !== 'riposo' ? `<div class="shift-label">${s.label}</div>` : ''}
+          ${assignedRep ? `<div class="shift-dep">${assignedRep.nome}</div>` : ''}
+          ${s.note ? `<div class="shift-label">📝 ${s.note}</div>` : ''}
+        </div>`;
+      } else {
+        html += `<div class="shift-pill shift-empty">+</div>`;
+      }
+      html += `</div>`;
+    });
+  });
+
+  html += `</div>`;
+
+  // Hours summary
+  html += `<div style="margin-top:24px">
+    <div class="section-title">Riepilogo ore settimanali</div>`;
+  employees.forEach(emp => {
+    const wh   = calcWeekHours(emp.id);
+    const diff = wh - emp.ore;
+    const pct  = Math.min(100, (wh / emp.ore) * 100);
+    const color = diff > 0 ? '#ff6584' : wh >= emp.ore * 0.9 ? '#43e97b' : '#ffb347';
+    const empDeps = empReparti(emp).map(rId => reparti.find(r => r.id === rId)?.nome).filter(Boolean);
+    html += `<div class="ore-summary">
+      <div>
+        <div class="name">${emp.nome}${empDeps.map(n => ` <span class="tag">${n}</span>`).join('')}</div>
+        <div style="margin-top:4px;background:var(--border);height:4px;width:180px;border-radius:2px;overflow:hidden">
+          <div style="width:${pct}%;height:100%;background:${color};border-radius:2px;transition:width 0.4s"></div>
+        </div>
+      </div>
+      <div class="nums">${wh}h / ${emp.ore}h<br>
+        <span style="color:${color}">${diff >= 0 ? '+' : ''}${Math.round(diff*10)/10}h</span>
+      </div>
+    </div>`;
+  });
+  html += `</div>`;
+
+  // Coverage table
+  if (reparti.length > 0) {
+    html += buildCoverageTable(dates);
+  }
+  html += buildValidationPanel(dates);
+
+  container.innerHTML = html;
+  updateStats();
+}
+
+// C29-COV-SLOT: copertura come presenza simultanea (min slot mattina, slot pomeriggio)
+// Un turno copre la mattina se inizia prima di lunchBreakStart;
+// copre il pomeriggio se finisce dopo lunchBreakEnd.
+// Copertura = min(presenti mattina, presenti pomeriggio).
+function repSlotCoverage(rId, dk) {
+  const lsh = parseHour(lunchBreakStart);
+  const leh = parseHour(lunchBreakEnd);
+  let morning = 0, afternoon = 0;
+  employees.forEach(emp => {
+    const s = (schedule[emp.id] || {})[dk];
+    if (!s || s.reparto !== rId) return;
+    if (['riposo','malattia','ferie','permesso'].includes(s.type)) return;
+    if (!s.start || !s.end) return;
+    if (parseHour(s.start) < lsh) morning++;
+    if (parseHour(s.end)   > leh) afternoon++;
+  });
+  return Math.min(morning, afternoon);
+}
+
+// Presenza continua del reparto, a mezz'ore, in tutto l'orario di apertura (pausa pranzo esclusa).
+// Ogni reparto deve avere SEMPRE almeno una persona: all'apertura, alla riapertura dopo pranzo
+// (es. nessuno 15:30-16:30 perché chi rientra entra alle 16:30) e fino alla chiusura.
+// repSlotCoverage da solo non lo garantisce: conta chi c'è "di mattina" e "di pomeriggio", non se c'è sempre qualcuno.
+//  → { open, close, holes: ['15:30','16:00'], holesTxt: '15:30-16:30' }
+const _dowByDk = {};
+function repOpenClose(rId, dk) {
+  const turno = turniConfig[0] || {};
+  // dk viene da fmt() (UTC): il giorno della settimana va preso dalla data locale corrispondente
+  let dow = _dowByDk[dk];
+  if (dow === undefined) {
+    const d = getWeekDates().find(x => fmt(x) === dk);
+    if (!d) return { open: true, close: true, holes: [], holesTxt: '' };
+    dow = _dowByDk[dk] = d.getDay();
+  }
+  const openT  = dow === 0 ? domenicaApertura : ((document.getElementById('store-open')?.value) || turno.start);
+  const closeT = (document.getElementById('store-close')?.value) || turno.end;
+  const oH = parseHour(openT), cH = parseHour(closeT);
+  const lsh = parseHour(lunchBreakStart), leh = parseHour(lunchBreakEnd);
+  const segs = [];
+  employees.forEach(emp => {
+    const s = (schedule[emp.id] || {})[dk];
+    if (!s || s.reparto !== rId || !s.start || !s.end) return;
+    if (['riposo','malattia','ferie','permesso'].includes(s.type)) return;
+    const st = parseHour(s.start), en = parseHour(s.end);
+    if (s.breakStart && s.breakEnd) segs.push([st, parseHour(s.breakStart)], [parseHour(s.breakEnd), en]);
+    else if (st < lsh && en > leh)  segs.push([st, lsh], [leh, en]);
+    else                            segs.push([st, en]);
+  });
+  const holesH = [];
+  for (let t = oH; t < cH - 0.01; t += 0.5) {
+    if (t >= lsh - 0.01 && t < leh - 0.01) continue;   // pausa pranzo: negozio chiuso
+    if (!segs.some(([a, b]) => a <= t + 0.01 && b >= Math.min(t + 0.5, cH) - 0.01)) holesH.push(t);
+  }
+  const hh = t => `${String(Math.floor(t)).padStart(2, '0')}:${String(Math.round((t % 1) * 60)).padStart(2, '0')}`;
+  const ranges = [];
+  holesH.forEach(t => {
+    const last = ranges[ranges.length - 1];
+    if (last && Math.abs(last[1] - t) < 0.01) last[1] = t + 0.5; else ranges.push([t, t + 0.5]);
+  });
+  return {
+    open:  !holesH.some(t => Math.abs(t - oH) < 0.01),
+    close: !holesH.some(t => t >= cH - 0.51),
+    holes: holesH.map(hh),
+    holesTxt: ranges.map(([a, b]) => `${hh(a)}-${hh(Math.min(b, cH))}`).join(', ')
+  };
+}
+
+function buildCoverageTable(dates) {
+  const today = fmt(new Date());
+  let html = `<div style="margin-top:24px">
+    <div class="section-title">Copertura reparti</div>
+    <table class="coverage-table">
+      <thead><tr>
+        <th>Reparto</th><th>Min</th>`;
+  dates.forEach(d => {
+    const isToday = fmt(d) === today;
+    html += `<th style="${isToday ? 'color:var(--accent)' : ''}">${dayName(d)}<br>${d.getDate()}</th>`;
+  });
+  html += `</tr></thead><tbody>`;
+
+  reparti.forEach(rep => {
+    html += `<tr><td>${rep.nome}</td><td style="color:var(--muted)">${rep.minCopertura}</td>`;
+    dates.forEach(d => {
+      const dk = fmt(d);
+      const dow = d.getDay();
+      const needsWork = dow !== 0 || domenicaAperto;
+      if (!needsWork || (dow === 0 && rep.chiusoDomenica)) {
+        html += `<td class="cov-skip">—</td>`;
+        return;
+      }
+      const working = repSlotCoverage(rep.id, dk); // C29-COV-SLOT: presenza simultanea
+      const oc = repOpenClose(rep.id, dk);
+      const ocMiss = rep.minCopertura && oc.holes.length > 0;
+      const cls = working === 0 ? 'cov-err' : (working < rep.minCopertura || ocMiss) ? 'cov-warn' : 'cov-ok';
+      const ocTxt = ocMiss ? `<br><span style="font-size:9px">vuoto ${oc.holesTxt}</span>` : '';
+      html += `<td class="${cls}" title="Presenza simultanea mattina/pomeriggio + reparto mai vuoto in orario di apertura">${working}/${rep.minCopertura}${ocTxt}</td>`;
+    });
+    html += `</tr>`;
+  });
+
+  html += `</tbody></table></div>`;
+  return html;
+}
+
+function buildValidationPanel(dates) {
+  const hasAny = employees.some(emp => dates.some(d => (schedule[emp.id] || {})[fmt(d)]));
+  if (!hasAny) return '';
+
+  const avgShiftH   = turniConfig.length > 0 ? shiftHours(turniConfig[0]) : 8;
+  const mattinaConf = turniConfig.find(t => t.id === 'mattina');
+  const pomConf     = turniConfig.find(t => t.id === 'pomeriggio');
+  const halfConfCalc = pomConf || mattinaConf;   // la mezza giornata è pomeridiana
+  const halfDayH    = halfConfCalc ? shiftHours(halfConfCalc) : avgShiftH / 2;
+  const hasHalfCfg  = !!(mattinaConf || pomConf);
+
+  const needsCov = (d) => d.getDay() !== 0 || domenicaAperto;
+  const empCanWork = (emp, d) => {
+    if (!needsCov(d)) return false;
+    if (d.getDay() === 0) {
+      const depts = empReparti(emp);
+      if (depts.length > 0 && depts.every(rId => {
+        const r = reparti.find(rep => rep.id === rId);
+        return r && r.chiusoDomenica;
+      })) return false;
+    }
+    return true;
+  };
+
+  let issueCount = 0;
+
+  const rows = employees.map(emp => {
+    const empSched = schedule[emp.id] || {};
+
+    let actualRiposo = 0, actualHalf = 0;
+    const halfDetails = [];
+    dates.forEach(d => {
+      const s = empSched[fmt(d)];
+      if (!s) return;
+      if (s.type === 'riposo') actualRiposo++;
+      // Solo la vera mezza giornata ha note='Mezza giornata' (o è manuale)
+      if ((s.type === 'mattina' || s.type === 'pomeriggio') &&
+          (s.note === 'Mezza giornata' || s.manual)) {
+        actualHalf++;
+        halfDetails.push(`${dayName(d)} (${s.label})`);
+      }
+    });
+
+    // Mirror generateSchedule's restDaysNeeded formula
+    // (i turni manuali di lavoro restano nel pool; solo riposo/assenza manuali sono esclusi)
+    const availDays = dates.filter(d => {
+      if (!empCanWork(emp, d)) return false;
+      const s = empSched[fmt(d)];
+      if (s && (s.type === 'riposo' || isAbsence(s.type))) return false;
+      return true;
+    }).length;
+    let expectedRiposo = 0;
+    if (availDays > 0) {
+      let workTarget;
+      if (hasHalfCfg) {
+        const fullNeeded = Math.ceil(Math.max(0, emp.ore - halfDayH) / avgShiftH);
+        workTarget = Math.min(availDays, fullNeeded + 1);
+      } else {
+        workTarget = Math.min(availDays, Math.ceil(emp.ore / avgShiftH));
+      }
+      expectedRiposo = Math.max(0, availDays - workTarget);
+    }
+    const expectedHalf = hasHalfCfg ? 1 : 0;
+
+    // Manual riposi are excluded from availDays, so add them to expected to avoid false alarms
+    const manualRiposoCount = dates.filter(d => {
+      const s = empSched[fmt(d)];
+      return s && s.type === 'riposo' && s.manual;
+    }).length;
+    const totalExpectedRiposo = expectedRiposo + manualRiposoCount;
+
+    const actualH  = calcWeekHours(emp.id);
+    const diff     = Math.round((actualH - emp.ore) * 10) / 10;
+    const oreOk    = Math.abs(diff) <= 0.5;  // ±30min: granularity of shift increments
+    const oreWarn  = !oreOk && Math.abs(diff) <= 1;
+    const ripOk    = actualRiposo === totalExpectedRiposo;
+    const halfOk   = actualHalf   === expectedHalf;
+
+    if (!oreOk || !ripOk || !halfOk) issueCount++;
+    return { emp, actualRiposo, expectedRiposo: totalExpectedRiposo, actualHalf, expectedHalf,
+             halfDetails, actualH, diff, oreOk, oreWarn, ripOk, halfOk };
+  });
+
+  const allOk = issueCount === 0;
+
+  let html = `
+  <div style="margin-top:24px">
+    <div class="section-title" style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+      Verifica automatica turni
+      <span style="padding:2px 10px;border-radius:100px;font-size:10px;font-weight:700;
+                   background:${allOk ? 'rgba(67,233,123,0.15)' : 'rgba(255,179,71,0.15)'};
+                   color:${allOk ? 'var(--accent3)' : 'var(--warn)'};
+                   border:1px solid ${allOk ? 'rgba(67,233,123,0.3)' : 'rgba(255,179,71,0.3)'}">
+        ${allOk ? '✅ Tutti i controlli OK' : `⚠️ ${issueCount} dipendente${issueCount > 1 ? 'i' : ''} con anomalie`}
+      </span>
+    </div>
+    <table class="coverage-table">
+      <thead><tr>
+        <th style="text-align:left">Dipendente</th>
+        <th>Monteore</th>
+        <th>Giorno libero</th>
+        <th>Mezza giornata</th>
+      </tr></thead>
+      <tbody>`;
+
+  rows.forEach(({ emp, actualRiposo, expectedRiposo, actualHalf, expectedHalf,
+                  halfDetails, actualH, diff, oreOk, oreWarn, ripOk, halfOk }) => {
+    const oreCls  = oreOk ? 'cov-ok' : oreWarn ? 'cov-warn' : 'cov-err';
+    const ripCls  = ripOk  ? 'cov-ok' : 'cov-err';
+    const halfCls = halfOk ? 'cov-ok' : 'cov-err';
+
+    const diffStr  = `${diff >= 0 ? '+' : ''}${diff}h`;
+    const oreStr   = `${actualH}/${emp.ore}h (${diffStr})`;
+    const ripStr   = `${actualRiposo}/${expectedRiposo}`;
+    const halfStr  = halfDetails.length
+      ? halfDetails.join(', ')
+      : (expectedHalf === 0 ? '—' : `0/${expectedHalf}`);
+
+    html += `
+      <tr>
+        <td>${emp.nome}</td>
+        <td class="${oreCls}" title="Ore lavorate / contratto">${oreOk ? '✓' : diff > 0 ? '↑' : '↓'} ${oreStr}</td>
+        <td class="${ripCls}" title="Giorni liberi effettivi / attesi">${ripOk ? '✓' : '✗'} ${ripStr}</td>
+        <td class="${halfCls}" title="Mezze giornate effettive / attese">${halfOk ? '✓' : '✗'} ${halfStr}</td>
+      </tr>`;
+  });
+
+  html += `</tbody></table></div>`;
+  return html;
+}
+
+function getShiftIcon(type) {
+  const icons = { riposo:'🌙', malattia:'🤒', ferie:'🏖️', permesso:'📋', intera:'🏪', mattina:'☀️', pomeriggio:'🌆', apertura:'🌅', chiusura:'🌇' };
+  return icons[type] || '⏰';
+}
+
+function getShiftClass(type) {
+  const cls = { riposo:'shift-riposo', malattia:'shift-malattia', ferie:'shift-ferie', permesso:'shift-permesso', intera:'shift-intera', mattina:'shift-mattina', pomeriggio:'shift-pomeriggio', apertura:'shift-apertura', chiusura:'shift-chiusura' };
+  return cls[type] || 'shift-intera';
+}
+
+// ==================== STATS ====================
+function updateStats() {
+  const today = fmt(new Date());
+  const dates = getWeekDates();
+
+  let attivi = 0, assenti = 0, extraOre = 0;
+  employees.forEach(emp => {
+    const ts = (schedule[emp.id] || {})[today];
+    if (!ts || !isAbsence(ts.type)) attivi++;
+    if (ts && isAbsence(ts.type)) assenti++;
+    const wh   = calcWeekHours(emp.id);
+    const diff = wh - emp.ore;
+    if (diff > 0) extraOre += diff;
+  });
+
+  // Coverage: count slots with issues across this week
+  let totalSlots = 0, okSlots = 0;
+  reparti.forEach(rep => {
+    dates.forEach(d => {
+      const dow = d.getDay();
+      if (dow === 0 && !domenicaAperto) return;
+      if (dow === 0 && rep.chiusoDomenica) return;
+      totalSlots++;
+      const dk = fmt(d);
+      const working = repSlotCoverage(rep.id, dk); // C29-COV-SLOT: presenza simultanea
+      const oc = repOpenClose(rep.id, dk);
+      if (working >= rep.minCopertura && (!rep.minCopertura || !oc.holes.length)) okSlots++;
+    });
+  });
+
+  document.getElementById('stat-attivi').textContent       = attivi;
+  document.getElementById('stat-assenti').textContent      = assenti;
+  document.getElementById('stat-straordinari').textContent = Math.round(extraOre*10)/10 + 'h';
+
+  const covEl = document.getElementById('stat-coverage');
+  if (totalSlots === 0) {
+    covEl.textContent = '—';
+    covEl.className   = 'stat-val';
+  } else {
+    const pct = Math.round((okSlots / totalSlots) * 100);
+    covEl.textContent = pct + '%';
+    covEl.className   = 'stat-val ' + (pct === 100 ? 'ok' : pct >= 80 ? 'warn' : 'err');
+  }
+}
+
+// ==================== MODAL ====================
+function openShiftModal(empId, date) {
+  _pendingEmpId    = empId;
+  _pendingDate     = date;
+  selectedShiftType = null;
+
+  const emp      = employees.find(e => e.id === empId);
+  const existing = (schedule[empId] || {})[date];
+  const d        = new Date(date);
+  const depsStr  = empReparti(emp).map(rId => reparti.find(r => r.id === rId)?.nome).filter(Boolean).join(' / ');
+
+  document.getElementById('modal-title-text').textContent = `${emp.nome} · ${dayName(d)} ${d.getDate()}`;
+  document.getElementById('modal-emp-info').textContent   = `${depsStr ? depsStr + ' · ' : ''}${emp.ruolo} · ${emp.ore}h/sett`;
+
+  const grid = document.getElementById('shift-options-grid');
+  let html = '';
+
+  turniConfig.forEach(t => {
+    const sel = existing && existing.type === t.id ? 'selected' : '';
+    html += `<div class="shift-option ${t.cssClass} ${sel}" onclick="selectShiftOption('${t.id}',this)">
+      ${getShiftIcon(t.id)} ${t.label}<br>
+      <span style="font-size:10px;opacity:0.7">${t.start}–${t.end}</span>
+    </div>`;
+  });
+
+  ABSENCE_TYPES.forEach(a => {
+    const sel = existing && existing.type === a.id ? 'selected' : '';
+    html += `<div class="shift-option ${a.cssClass} ${sel}" onclick="selectShiftOption('${a.id}',this)">
+      ${a.icon} ${a.label}
+    </div>`;
+  });
+
+  html += `<div class="shift-option shift-empty" onclick="selectShiftOption('clear',this)" style="grid-column:span 2">🗑️ Rimuovi turno</div>`;
+  grid.innerHTML = html;
+
+  document.getElementById('absence-note').value = existing?.note || '';
+  // C29-MANUAL-HRS: prefilla i campi mattina/pomeriggio solo se il turno è già manuale con orari
+  let mS = '', mE = '', pS = '', pE = '';
+  if (existing && existing.manual && existing.start && existing.end) {
+    if (existing.breakStart && existing.breakEnd) {
+      mS = existing.start; mE = existing.breakStart;     // fascia mattina
+      pS = existing.breakEnd; pE = existing.end;          // fascia pomeriggio
+    } else if (parseHour(existing.start) >= parseHour(lunchBreakEnd)) {
+      pS = existing.start; pE = existing.end;             // solo pomeriggio
+    } else {
+      mS = existing.start; mE = existing.end;             // mattina o blocco unico
+    }
+  }
+  document.getElementById('custom-m-start').value = mS;
+  document.getElementById('custom-m-end').value   = mE;
+  document.getElementById('custom-p-start').value = pS;
+  document.getElementById('custom-p-end').value   = pE;
+  document.getElementById('shift-modal').style.display = 'flex';
+}
+
+function selectShiftOption(type, el) {
+  selectedShiftType = type;
+  document.querySelectorAll('.shift-option').forEach(e => e.classList.remove('selected'));
+  el.classList.add('selected');
+}
+
+function applyShiftChange() {
+  const note = document.getElementById('absence-note').value.trim();
+  const mS = document.getElementById('custom-m-start').value;
+  const mE = document.getElementById('custom-m-end').value;
+  const pS = document.getElementById('custom-p-start').value;
+  const pE = document.getElementById('custom-p-end').value;
+
+  // C29-MANUAL-HRS: orari personalizzati (mattina/pomeriggio) hanno precedenza sul tile selezionato
+  const hasMorning   = !!(mS && mE);
+  const hasAfternoon = !!(pS && pE);
+  if (hasMorning || hasAfternoon) {
+    if (hasMorning && parseHour(mE) <= parseHour(mS)) {
+      showToast('Mattina: la fine deve essere dopo l\'inizio', 'warn'); return;
+    }
+    if (hasAfternoon && parseHour(pE) <= parseHour(pS)) {
+      showToast('Pomeriggio: la fine deve essere dopo l\'inizio', 'warn'); return;
+    }
+    if (hasMorning && hasAfternoon && parseHour(pS) < parseHour(mE)) {
+      showToast('Il pomeriggio deve iniziare dopo la mattina', 'warn'); return;
+    }
+
+    let start, end, extra = null;
+    if (hasMorning && hasAfternoon) {
+      start = mS; end = pE;
+      // pausa libera tra le due fasce (solo se non contigue)
+      if (parseHour(pS) > parseHour(mE)) extra = { breakStart: mE, breakEnd: pS };
+    } else if (hasMorning) {
+      start = mS; end = mE;
+    } else {
+      start = pS; end = pE;
+    }
+
+    const emp      = employees.find(e => e.id === _pendingEmpId);
+    const existing = (schedule[_pendingEmpId] || {})[_pendingDate];
+    const rId      = existing?.reparto || empReparti(emp)[0] || null;
+    const t        = (selectedShiftType && selectedShiftType !== 'clear'
+                      && !isAbsence(selectedShiftType) && selectedShiftType !== 'riposo')
+                     ? turniConfig.find(x => x.id === selectedShiftType) : null;
+    setShift(_pendingEmpId, _pendingDate, t ? t.id : 'intera', t ? t.label : 'Personalizzato',
+             start, end, note, rId, true, extra);
+    closeModal(); renderCalendar(); renderEmpList(); saveData();
+    showToast(`Turno personalizzato per ${emp.nome}`, 'success');
+    return;
+  }
+
+  if (!selectedShiftType) { showToast('Seleziona un tipo di turno', 'warn'); return; }
+
+  if (selectedShiftType === 'clear') {
+    delete (schedule[_pendingEmpId] || {})[_pendingDate];
+  } else if (selectedShiftType === 'riposo') {
+    setShift(_pendingEmpId, _pendingDate, 'riposo', 'Riposo', null, null, note, null, true);
+  } else if (isAbsence(selectedShiftType)) {
+    const a = ABSENCE_TYPES.find(x => x.id === selectedShiftType);
+    setShift(_pendingEmpId, _pendingDate, selectedShiftType, a.label, null, null, note, null, true);
+    autoReallocate(_pendingEmpId, _pendingDate);
+  } else {
+    const t = turniConfig.find(x => x.id === selectedShiftType);
+    const emp = employees.find(e => e.id === _pendingEmpId);
+    const existing = (schedule[_pendingEmpId] || {})[_pendingDate];
+    const rId = existing?.reparto || empReparti(emp)[0] || null;
+    setShift(_pendingEmpId, _pendingDate, t.id, t.label, t.start, t.end, note, rId, true);
+  }
+
+  closeModal();
+  renderCalendar();
+  renderEmpList();
+  saveData();
+  const emp = employees.find(e => e.id === _pendingEmpId);
+  showToast(`✅ Turno aggiornato per ${emp.nome}`, 'success');
+}
+
+function autoReallocate(absentEmpId, date) {
+  const absentEmp = employees.find(e => e.id === absentEmpId);
+  const covered   = employees.find(emp => {
+    if (emp.id === absentEmpId) return false;
+    const existing = (schedule[emp.id] || {})[date];
+    if (existing && existing.manual) return false; // don't override manual entries
+    if (existing && existing.type !== 'riposo' && !isAbsence(existing.type)) return false;
+    return calcWeekHours(emp.id) < emp.ore + 4;
+  });
+
+  if (covered) {
+    const coverShift = turniConfig[0];
+    const absentRep = empReparti(absentEmp)[0] || null;
+    const covRep = (absentRep && empReparti(covered).includes(absentRep)) ? absentRep : (empReparti(covered)[0] || null);
+    setShift(covered.id, date, coverShift.id, coverShift.label, coverShift.start, coverShift.end, `Copertura per ${absentEmp.nome}`, covRep);
+    showToast(`🔄 ${covered.nome} in copertura per ${absentEmp.nome}`, 'success');
+  } else {
+    showToast(`⚠️ Nessun dipendente disponibile per coprire ${absentEmp.nome}`, 'warn');
+  }
+}
+
+function closeModal() {
+  document.getElementById('shift-modal').style.display = 'none';
+  selectedShiftType = null;
+}
+
+function closeModalOutside(e) {
+  if (e.target.id === 'shift-modal') closeModal();
+}
+
+// ==================== TURNI CONFIG ====================
+function renderTurniConfig() {
+  const list = document.getElementById('turni-config-list');
+  list.innerHTML = turniConfig.map((t, i) => `
+    <div class="turno-config">
+      <div class="turno-config-header">
+        <span class="${t.cssClass}" style="padding:2px 8px;border-radius:4px;font-size:11px">${t.label}</span>
+      </div>
+      <div class="two-col">
+        <div class="form-group">
+          <label class="form-label">Inizio</label>
+          <input type="time" value="${t.start}" onchange="turniConfig[${i}].start=this.value">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Fine</label>
+          <input type="time" value="${t.end}" onchange="turniConfig[${i}].end=this.value">
+        </div>
+      </div>
+    </div>
+  `).join('');
+
+  document.getElementById('domenica-open').value    = domenicaAperto ? '1' : '0';
+  document.getElementById('domenica-apertura').value = domenicaApertura;
+  document.getElementById('lunch-start').value       = lunchBreakStart;
+  document.getElementById('lunch-end').value         = lunchBreakEnd;
+}
+
+function saveTurniConfig() {
+  domenicaAperto   = document.getElementById('domenica-open').value === '1';
+  domenicaApertura = document.getElementById('domenica-apertura').value;
+  lunchBreakStart  = document.getElementById('lunch-start').value;
+  lunchBreakEnd    = document.getElementById('lunch-end').value;
+  saveData();
+  showToast('⚙️ Configurazione salvata', 'success');
+}
+
+// ==================== TABS ====================
+function switchTab(tab, el) {
+  ['dipendenti','aggiungi','reparti','turni'].forEach(t => {
+    document.getElementById('tab-' + t).style.display = t === tab ? 'block' : 'none';
+  });
+  document.querySelectorAll('.stab').forEach(e => e.classList.remove('active'));
+  el.classList.add('active');
+
+  if (tab === 'turni')    renderTurniConfig();
+  if (tab === 'reparti')  renderRepartiList();
+  if (tab === 'aggiungi') populateRepartiChecklist();
+}
+
+// ==================== TOAST ====================
+function showToast(msg, type = 'success') {
+  const t = document.createElement('div');
+  t.className   = `toast ${type}`;
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 3500);
+}
+
+// ==================== EXCEL EXPORT ====================
+async function downloadExcel() {
+  if (!employees.length) { showToast('Nessun dipendente da esportare', 'warn'); return; }
+  if (typeof ExcelJS === 'undefined') { showToast('Libreria Excel non caricata. Controlla la connessione.', 'error'); return; }
+
+  const dates     = getWeekDates();
+  const weekStart = dates[0];
+  const weekEnd   = dates[6];
+
+  const fmtD = d => `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}`;
+  const fmtDFull = d => `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
+
+  // ARGB colors (matching reference file)
+  const C_YELLOW  = 'FFFFFF00'; // title bg
+  const C_ORANGE  = 'FFFFC000'; // orario header + time cells
+  const C_BLUE    = 'FF0070C0'; // day names + WT column
+  const C_PURPLE  = 'FF403152'; // T column + separator rows
+  const C_CYAN    = 'FF00B0F0'; // riposo / assenze
+  const C_WHITE   = 'FFFFFFFF';
+  const C_BLACK   = 'FF000000';
+  const C_YWTEXT  = 'FFFFFF00'; // yellow text on dark bg (T cols)
+  const DEPT_BG   = ['FFDEEBF7','FFFE9999','FFE2EFDA','FFFFF2CC',
+                     'FFF4CCFF','FFFCE4EC','FFDAE8FC','FFFFE6CC'];
+
+  // ExcelJS column letter helper (1-indexed)
+  const cl = n => { let s=''; while(n>0){n--;s=String.fromCharCode(65+n%26)+s;n=Math.floor(n/26);} return s; };
+
+  // Universal cell styler
+  const styl = (cell, bg, fg, bold=true, size=10) => {
+    cell.fill = { type:'pattern', pattern:'solid', fgColor:{argb:bg} };
+    cell.font = { bold, color:{argb:fg}, size, name:'Calibri' };
+    cell.alignment = { horizontal:'center', vertical:'middle', wrapText:false };
+    cell.border = {
+      top:    { style:'thin', color:{argb:'FFB0B0C0'} },
+      left:   { style:'thin', color:{argb:'FFB0B0C0'} },
+      bottom: { style:'thin', color:{argb:'FFB0B0C0'} },
+      right:  { style:'thin', color:{argb:'FFB0B0C0'} },
+    };
+  };
+
+  // Split shift around lunch break → {e1,u1,e2,u2} as day-fraction or null
+  function splitShift(start, end, brkStart, brkEnd) {
+    if (!start || !end) return { e1:null, u1:null, e2:null, u2:null };
+    const sh=parseHour(start), eh=parseHour(end);
+    // Pausa personalizzata (turno spezzato manuale mattina/pomeriggio): rispetta le due fasce
+    if (brkStart && brkEnd) {
+      return { e1: sh/24, u1: parseHour(brkStart)/24, e2: parseHour(brkEnd)/24, u2: eh/24 };
+    }
+    const lsh=parseHour(lunchBreakStart), leh=parseHour(lunchBreakEnd);
+    if (eh <= lsh)         return { e1:sh/24, u1:eh/24,  e2:null,    u2:null    };
+    if (sh >= leh)         return { e1:null,  u1:null,   e2:sh/24,   u2:eh/24   };
+    if (sh < lsh && eh > leh) return { e1:sh/24, u1:lsh/24, e2:leh/24, u2:eh/24 };
+    if (sh < lsh)          return { e1:sh/24, u1:lsh/24, e2:null,    u2:null    };
+    return                        { e1:null,  u1:null,   e2:leh/24,  u2:eh/24   };
+  }
+
+  // ── Workbook setup ────────────────────────────────────────────────────────
+  const NCOLS = 38; // A..AL
+  const wb = new ExcelJS.Workbook();
+  wb.creator = 'ShiftFlow';
+  const ws = wb.addWorksheet('Turni');
+
+  ws.pageSetup.orientation    = 'landscape';
+  ws.pageSetup.fitToPage      = true;
+  ws.pageSetup.fitToWidth     = 1;
+  ws.pageSetup.fitToHeight    = 0;
+  ws.pageSetup.paperSize      = 9; // A4
+  ws.pageSetup.printTitlesRow = '1:5';
+  ws.pageSetup.margins        = { left:0.4, right:0.4, top:0.5, bottom:0.5, header:0.2, footer:0.2 };
+
+  ws.getColumn(1).width = 16;
+  ws.getColumn(2).width = 28;
+  for (let d = 0; d < 7; d++) {
+    const b = 3 + d * 5;
+    ws.getColumn(b).width=11; ws.getColumn(b+1).width=11;
+    ws.getColumn(b+2).width=11; ws.getColumn(b+3).width=11;
+    ws.getColumn(b+4).width=10;
+  }
+  ws.getColumn(NCOLS).width = 10;
+
+  // ── Row 1: Titolo ─────────────────────────────────────────────────────────
+  ws.getRow(1).height = 28;
+  const t1 = ws.getCell(1,1);
+  t1.value = `TURNI DAL ${fmtD(weekStart)} AL ${fmtD(weekEnd)}`;
+  styl(t1, C_YELLOW, C_BLACK, true, 14);
+  ws.mergeCells(1,1,1,NCOLS);
+
+  // ── Row 2: Orario per giorno ──────────────────────────────────────────────
+  ws.getRow(2).height = 17;
+  styl(ws.getCell(2,1), C_ORANGE, C_BLACK); styl(ws.getCell(2,2), C_ORANGE, C_BLACK);
+  ws.mergeCells(2,1,2,2);
+  const storeOpen  = document.getElementById('store-open')?.value  || '09:30';
+  const storeClose = document.getElementById('store-close')?.value || '20:00';
+  for (let d = 0; d < 7; d++) {
+    const b = 3 + d * 5;
+    const closed = dates[d].getDay()===0 && !domenicaAperto;
+    const label = closed ? '— CHIUSO —' : `${storeOpen}-${lunchBreakStart}/${lunchBreakEnd}-${storeClose}`;
+    for (let i = 0; i < 5; i++) styl(ws.getCell(2,b+i), C_ORANGE, C_BLACK, true, 9);
+    ws.getCell(2,b).value = label;
+    ws.mergeCells(2,b,2,b+4);
+  }
+  styl(ws.getCell(2,NCOLS), C_ORANGE, C_BLACK);
+
+  // ── Row 3: Date ───────────────────────────────────────────────────────────
+  ws.getRow(3).height = 17;
+  styl(ws.getCell(3,1),'FFF2F2F2',C_BLACK,false); styl(ws.getCell(3,2),'FFF2F2F2',C_BLACK,false);
+  ws.mergeCells(3,1,3,2);
+  for (let d = 0; d < 7; d++) {
+    const b = 3 + d * 5;
+    for (let i = 0; i < 5; i++) styl(ws.getCell(3,b+i),'FFF2F2F2',C_BLACK,true,10);
+    ws.getCell(3,b).value = fmtDFull(dates[d]);
+    ws.mergeCells(3,b,3,b+4);
+  }
+  styl(ws.getCell(3,NCOLS),'FFF2F2F2',C_BLACK,false);
+
+  // ── Row 4: Nomi giorno ────────────────────────────────────────────────────
+  ws.getRow(4).height = 17;
+  const DAY_IT = ['Domenica','Lunedì','Martedì','Mercoledì','Giovedì','Venerdì','Sabato'];
+  styl(ws.getCell(4,1),C_BLUE,C_WHITE); styl(ws.getCell(4,2),C_BLUE,C_WHITE);
+  for (let d = 0; d < 7; d++) {
+    const b = 3 + d * 5;
+    for (let i = 0; i < 5; i++) styl(ws.getCell(4,b+i),C_BLUE,C_WHITE);
+    ws.getCell(4,b).value = DAY_IT[dates[d].getDay()].toUpperCase();
+    ws.mergeCells(4,b,4,b+4);
+  }
+  styl(ws.getCell(4,NCOLS),C_BLUE,C_WHITE);
+
+  // ── Row 5: Intestazioni colonne ───────────────────────────────────────────
+  ws.getRow(5).height = 17;
+  const HDR_BG = 'FFD9E1F2';
+  styl(ws.getCell(5,1),HDR_BG,C_BLACK); ws.getCell(5,1).value='REPARTO';
+  styl(ws.getCell(5,2),HDR_BG,C_BLACK); ws.getCell(5,2).value='ADDETTO';
+  for (let d = 0; d < 7; d++) {
+    const b = 3 + d * 5;
+    ['E','U','E','U'].forEach((v,i) => { styl(ws.getCell(5,b+i),HDR_BG,C_BLACK); ws.getCell(5,b+i).value=v; });
+    styl(ws.getCell(5,b+4),C_PURPLE,C_WHITE); ws.getCell(5,b+4).value='T';
+  }
+  styl(ws.getCell(5,NCOLS),C_BLUE,C_WHITE); ws.getCell(5,NCOLS).value='WT';
+
+  // ── Righe dipendenti ──────────────────────────────────────────────────────
+  const groups = [];
+  reparti.forEach(rep => {
+    const emps = employees.filter(e => empReparti(e)[0] === rep.id);
+    if (emps.length) groups.push({ rep, emps });
+  });
+  const noRep = employees.filter(e => empReparti(e).length === 0);
+  if (noRep.length) groups.push({ rep:null, emps:noRep });
+
+  const T_COLS = [7,12,17,22,27,32,37]; // indici colonna T per ogni giorno
+  let r = 6;
+
+  groups.forEach(({ rep, emps }, gIdx) => {
+    const dBg    = DEPT_BG[gIdx % DEPT_BG.length];
+    const gStart = r;
+
+    emps.forEach((emp, eIdx) => {
+      ws.getRow(r).height = 30;
+
+      // Col A: reparto
+      styl(ws.getCell(r,1), dBg, C_BLACK, true, 14);
+      if (eIdx === 0) ws.getCell(r,1).value = rep ? rep.nome.toUpperCase() : '';
+
+      // Col B: nome
+      styl(ws.getCell(r,2), C_WHITE, C_BLACK, true, 18);
+      ws.getCell(r,2).value = emp.nome.toUpperCase();
+      ws.getCell(r,2).alignment = { horizontal:'left', vertical:'middle' };
+
+      const wtParts = T_COLS.map(tc => `${cl(tc)}${r}`);
+
+      dates.forEach((d, dIdx) => {
+        const dk = fmt(d);
+        const s  = (schedule[emp.id]||{})[dk];
+        const b  = 3 + dIdx * 5;
+
+        // Colonna T (formula sempre presente)
+        const tCell = ws.getCell(r, b+4);
+        tCell.value = { formula:`=(${cl(b+1)}${r}-${cl(b)}${r})+(${cl(b+3)}${r}-${cl(b+2)}${r})`, result:0 };
+        tCell.numFmt = '[h]:mm';
+        styl(tCell, C_PURPLE, C_YWTEXT, true, 18);
+
+        if (!s || s.type === 'riposo') {
+          for (let i=0;i<4;i++) styl(ws.getCell(r,b+i),C_CYAN,C_WHITE,true,18);
+          ws.getCell(r,b).value = 0;
+          ws.mergeCells(r,b,r,b+3);
+        } else if (isAbsence(s.type)) {
+          const lbl = {malattia:'MALATTIA',ferie:'FERIE',permesso:'PERMESSO'}[s.type]||s.type.toUpperCase();
+          for (let i=0;i<4;i++) styl(ws.getCell(r,b+i),C_CYAN,C_WHITE,true,18);
+          ws.getCell(r,b).value = lbl;
+          ws.mergeCells(r,b,r,b+3);
+        } else {
+          const {e1,u1,e2,u2} = splitShift(s.start, s.end, s.breakStart, s.breakEnd);
+          [e1,u1,e2,u2].forEach((t,i) => {
+            const c = ws.getCell(r,b+i);
+            styl(c,C_ORANGE,C_BLACK,true,18);
+            if (t !== null) { c.value=t; c.numFmt='hh:mm'; }
+          });
+        }
+      });
+
+      // Colonna WT
+      const wtC = ws.getCell(r,NCOLS);
+      wtC.value = { formula:`=SUM(${wtParts.join(',')})`, result:0 };
+      wtC.numFmt = '[h]:mm';
+      styl(wtC,C_BLUE,C_WHITE,true,18);
+
+      r++;
+    });
+
+    // Unisci col A verticalmente per il reparto
+    if (emps.length > 1) ws.mergeCells(gStart,1,r-1,1);
+
+    // Riga separatore tra reparti
+    ws.getRow(r).height = 5;
+    for (let c=1;c<=NCOLS;c++) styl(ws.getCell(r,c),C_PURPLE,C_PURPLE);
+    ws.mergeCells(r,1,r,NCOLS);
+    r++;
+  });
+
+  // ── Download ──────────────────────────────────────────────────────────────
+  const buffer = await wb.xlsx.writeBuffer();
+  const blob = new Blob([buffer],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url;
+  a.download = `TURNI_${fmtD(weekStart).replace(/\//g,'.')}_${fmtD(weekEnd).replace(/\//g,'.')}.xlsx`;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showToast('✅ File Excel scaricato!', 'success');
+}
+
+// ==================== RESET ====================
+function resetWeekSchedule() {
+  const dates = getWeekDates();
+  const weekLabel = document.getElementById('weekLabel').textContent;
+  if (!confirm(`Resettare tutti i turni della settimana ${weekLabel}?\n\nVerranno cancellate anche le selezioni manuali (🔒).`)) return;
+  employees.forEach(emp => {
+    if (!schedule[emp.id]) return;
+    dates.forEach(d => { delete schedule[emp.id][fmt(d)]; });
+  });
+  renderCalendar();
+  renderEmpList();
+  saveData();
+  showToast('🗑️ Turni della settimana resettati', 'warn');
+}
+
+// ==================== INIT ====================
+loadData();
+currentWeekStart = getMonday(new Date());
+
+// Default reparti if none saved
+if (!reparti.length) {
+  reparti = [
+    { id: genId(), nome: 'Cassa',      minCopertura: 1 },
+    { id: genId(), nome: 'Reparto',    minCopertura: 2 },
+    { id: genId(), nome: 'Magazzino',  minCopertura: 1 },
+  ];
+  saveData();
+}
+
+updateWeekLabel();
+renderEmpList();
+renderCalendar();
+renderRepartiList();
+</script>
+</body>
+</html>

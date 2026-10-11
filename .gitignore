@@ -1,0 +1,41 @@
+
+# --- safety (added before GitHub publish) ---
+.env
+.env.*
+!.env.example
+*.env
+*.pem
+*.key
+*.p12
+*.jks
+*.keystore
+key.properties
+*service-account*.json
+boreal-sweep-*.json
+*.db
+*.sqlite
+*.sqlite3
+.claude/settings.local.json
+lancedb/
+models/Xenova/
+node_modules/
+.venv/
+venv/
+__pycache__/
+*.pyc
+.next/
+dist/
+logs/
+*.log
+
+# personal data
+*.xlsx
+*.JPG
+*.jpg
+
+# presets with employee names
+*preset*.json
+Preset orari offi.json
+
+# copia locale con i nomi reali (non pubblicare)
+_locale_con_nomi/

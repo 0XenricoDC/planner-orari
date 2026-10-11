@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ShiftFlow — Guida all'uso</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+  :root {
+    --bg: #f8f9fc;
+    --surface: #ffffff;
+    --border: #e2e6f0;
+    --accent: #6c63ff;
+    --accent-light: #ede9ff;
+    --green: #1d9655;
+    --green-light: #e6f7ee;
+    --warn: #b45309;
+    --warn-light: #fef3c7;
+    --text: #1a1a2e;
+    --muted: #6b7280;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    font-size: 15px;
+    line-height: 1.6;
+    padding: 40px 20px 80px;
+  }
+
+  .container { max-width: 800px; margin: 0 auto; }
+
+  /* Hero */
+  .hero {
+    background: linear-gradient(135deg, #6c63ff, #a78bfa);
+    border-radius: 16px;
+    padding: 36px 40px;
+    color: white;
+    margin-bottom: 32px;
+  }
+  .hero-badge {
+    display: inline-block;
+    background: rgba(255,255,255,0.2);
+    border-radius: 100px;
+    padding: 4px 14px;
+    font-size: 12px;
+    font-weight: 600;
+    margin-bottom: 14px;
+    letter-spacing: 0.5px;
+  }
+  .hero-title { font-size: 28px; font-weight: 700; margin-bottom: 8px; letter-spacing: -0.5px; }
+  .hero-sub { font-size: 14px; opacity: 0.85; line-height: 1.6; }
+
+  /* Section label */
+  h2 {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--muted);
+    font-weight: 600;
+    margin: 32px 0 12px;
+  }
+
+  hr { border: none; border-top: 1px solid var(--border); margin: 28px 0; }
+
+  /* Cards */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 26px 30px;
+    margin-bottom: 18px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+  }
+
+  .card-title {
+    font-size: 16px;
+    font-weight: 700;
+    margin-bottom: 18px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .card-title .icon {
+    width: 34px; height: 34px;
+    border-radius: 9px;
+    background: var(--accent-light);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 17px;
+    flex-shrink: 0;
+  }
+
+  /* Steps */
+  .steps { display: flex; flex-direction: column; gap: 12px; }
+  .step {
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+    background: var(--bg);
+    border-radius: 10px;
+    padding: 13px 15px;
+    border: 1px solid var(--border);
+  }
+  .step-num {
+    width: 26px; height: 26px;
+    background: var(--accent);
+    color: white;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px;
+    font-weight: 700;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+  .step-body strong { display: block; font-weight: 600; margin-bottom: 3px; font-size: 14px; }
+  .step-body span { font-size: 13px; color: var(--muted); line-height: 1.5; }
+
+  /* Table */
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th {
+    background: var(--bg);
+    text-align: left;
+    padding: 9px 13px;
+    font-weight: 600;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--muted);
+    border-bottom: 1px solid var(--border);
+  }
+  td { padding: 9px 13px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: var(--bg); }
+
+  /* Pills */
+  .pill {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 100px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .pill-intera    { background: #1a2d1a; color: #60efb0; }
+  .pill-mattina   { background: #1a2d44; color: #64d8ff; }
+  .pill-pomeriggio{ background: #2d1f44; color: #b088ff; }
+  .pill-riposo    { background: #1a1a2a; color: #8080c0; font-style: italic; }
+  .pill-malattia  { background: #2d1010; color: #ff6060; }
+  .pill-ferie     { background: #2a2710; color: #ffd060; }
+  .pill-permesso  { background: #0f1e2d; color: #6ab4f6; }
+
+  /* Tips */
+  .tip {
+    display: flex;
+    gap: 12px;
+    padding: 13px 15px;
+    border-radius: 10px;
+    margin-top: 14px;
+    font-size: 13px;
+    line-height: 1.5;
+    align-items: flex-start;
+  }
+  .tip-icon { font-size: 17px; flex-shrink: 0; margin-top: 1px; }
+  .tip-green  { background: var(--green-light);  border: 1px solid #bbf0d2; color: var(--green); }
+  .tip-warn   { background: var(--warn-light);   border: 1px solid #fde68a; color: var(--warn); }
+  .tip-purple { background: var(--accent-light); border: 1px solid #c4bafe; color: #5b4fcf; }
+
+  /* Excel preview */
+  .excel-preview {
+    font-family: monospace;
+    font-size: 11px;
+    background: #f0fdf4;
+    border: 1px solid #86efac;
+    border-radius: 8px;
+    padding: 12px;
+    overflow-x: auto;
+    color: #166534;
+    line-height: 1.8;
+    margin-top: 12px;
+  }
+  .excel-preview .row { display: flex; }
+  .excel-preview .cell {
+    border: 1px solid #bbf7d0;
+    padding: 2px 7px;
+    min-width: 68px;
+    white-space: nowrap;
+  }
+  .excel-preview .cell.head { background: #dcfce7; font-weight: 700; color: #14532d; }
+  .excel-preview .cell.rest { color: #6b7280; }
+  .excel-preview .cell.work { color: #166534; font-weight: 600; }
+  .excel-preview .cell.total { background: #bbf7d0; font-weight: 700; }
+
+  /* Grid 2 col */
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .info-box {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 15px;
+    font-size: 13px;
+  }
+  .info-box strong { display: block; margin-bottom: 3px; font-size: 14px; }
+  .info-box span { color: var(--muted); }
+
+  /* Stat boxes */
+  .stat-row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+  .stat-box {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 14px;
+    flex: 1;
+    min-width: 120px;
+    font-size: 13px;
+  }
+  .stat-box .label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 2px; }
+  .stat-box .val { font-size: 18px; font-weight: 700; }
+  .ok   { color: #1d9655; }
+  .warn { color: #b45309; }
+  .err  { color: #dc2626; }
+  .pur  { color: #6c63ff; }
+
+  /* Coverage indicators */
+  .cov-row { display: flex; gap: 16px; flex-wrap: wrap; font-size: 13px; margin-top: 8px; }
+  .cov-row span { font-weight: 700; }
+
+  .footer { text-align: center; color: var(--muted); font-size: 12px; margin-top: 48px; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- HERO -->
+  <div class="hero">
+    <div class="hero-badge">GUIDA RAPIDA — v2.0</div>
+    <div class="hero-title">ShiftFlow — Come si usa</div>
+    <div class="hero-sub">
+      Apri <strong>shift-planner.html</strong> nel browser per iniziare.<br>
+      Nessuna installazione richiesta. I dati vengono salvati automaticamente nel browser.
+    </div>
+  </div>
+
+  <!-- PRIMA CONFIGURAZIONE -->
+  <div class="card">
+    <div class="card-title">
+      <div class="icon">🚀</div>
+      Prima configurazione (solo la prima volta)
+    </div>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <strong>Tab 🏪 Reparti — configura i reparti</strong>
+          <span>Aggiungi i reparti del negozio (Cassa, Isola, Magazzino…). Per ognuno indica quanti dipendenti devono essere presenti ogni giorno lavorativo. Il generatore garantirà sempre quella copertura minima.<br>
+          Opzione <em>Chiuso la domenica</em>: se spuntata, quel reparto non contribuisce alla copertura di domenica (utile per reparti che non aprono il giorno di festa), ma i dipendenti rimangono comunque disponibili se il negozio è aperto.</span>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-body">
+          <strong>Tab ➕ Aggiungi — inserisci i dipendenti</strong>
+          <span>Per ogni dipendente indica: nome, ore contrattuali settimanali, reparto di appartenenza, ruolo e colore identificativo. Il colore serve solo a riconoscerli velocemente nel calendario.</span>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-body">
+          <strong>Tab ⚙️ Turni — verifica orari e impostazioni</strong>
+          <span>Controlla gli orari dei 3 turni (Giornata Intera, Solo Mattina, Solo Pomeriggio), la fascia di pausa pranzo e se il negozio è aperto la domenica. Premi <strong>Salva configurazione</strong> dopo ogni modifica agli orari o alla pausa.<br>
+          L'impostazione <em>Domenica aperto</em> si salva automaticamente non appena la cambi.</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- USO SETTIMANALE -->
+  <div class="card">
+    <div class="card-title">
+      <div class="icon">📅</div>
+      Uso settimanale
+    </div>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <strong>Seleziona la settimana</strong>
+          <span>Usa le frecce ‹ › in alto a destra per navigare tra le settimane. Le date sono visibili accanto alle frecce.</span>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-body">
+          <strong>Inserisci le assenze già note</strong>
+          <span>Clicca su una cella del calendario e scegli Malattia, Ferie o Permesso. Queste celle vengono bloccate (🔒) e il generatore non le toccherà. Se inserisci una Malattia, l'app cerca automaticamente un collega disponibile per la copertura.</span>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-body">
+          <strong>Premi "⚡ Genera Turni Settimana"</strong>
+          <span>Il generatore assegna turni e riposi rispettando il contratto di ore di ogni dipendente e la copertura minima di ogni reparto ogni giorno. I riposi vengono distribuiti preferendo i giorni infrasettimanali, lasciando il fine settimana come giorni lavorativi.</span>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">4</div>
+        <div class="step-body">
+          <strong>Aggiusta manualmente se necessario</strong>
+          <span>Clicca su qualsiasi cella per cambiare turno, assegnare un riposo o inserire un'assenza. Le modifiche manuali vengono bloccate con 🔒 e non vengono sovrascritte da una nuova generazione.</span>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">5</div>
+        <div class="step-body">
+          <strong>Scarica il file Excel — pulsante "⬇ Scarica Excel"</strong>
+          <span>Il file viene salvato nella cartella Download con nome <em>TURNI DD-MM-YY_DD-MM-YY.xlsx</em>. La struttura è identica al formato ufficiale (colonne E/U mattina, E/U pomeriggio, T totale per ogni giorno).</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="tip tip-green">
+      <div class="tip-icon">💾</div>
+      <div><strong>Salvataggio automatico</strong> — i dati vengono salvati nel browser dopo ogni azione. Riapri il file domani e trovi tutto com'era. Attenzione: cancellare la cronologia del browser elimina i dati salvati.</div>
+    </div>
+  </div>
+
+  <!-- TIPI DI TURNO -->
+  <div class="card">
+    <div class="card-title">
+      <div class="icon">⏰</div>
+      Tipi di turno e assenze
+    </div>
+    <table>
+      <thead>
+        <tr><th>Tipo</th><th>Orario di default</th><th>Assegnazione</th><th>Note</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="pill pill-intera">🏪 Giornata Intera</span></td>
+          <td>09:30 – 20:00</td>
+          <td>Automatica</td>
+          <td>Turno standard con pausa pranzo. Il generatore usa sempre questo tipo.</td>
+        </tr>
+        <tr>
+          <td><span class="pill pill-mattina">☀️ Solo Mattina</span></td>
+          <td>09:30 – 13:00</td>
+          <td>Manuale</td>
+          <td>Assegna a mano cliccando sulla cella. Non include la pausa.</td>
+        </tr>
+        <tr>
+          <td><span class="pill pill-pomeriggio">🌆 Solo Pomeriggio</span></td>
+          <td>15:30 – 20:00</td>
+          <td>Manuale</td>
+          <td>Assegna a mano cliccando sulla cella. Non include la pausa.</td>
+        </tr>
+        <tr>
+          <td><span class="pill pill-riposo">🌙 Riposo</span></td>
+          <td>—</td>
+          <td>Auto / Manuale</td>
+          <td>Giorno libero, non conta nelle ore settimanali.</td>
+        </tr>
+        <tr>
+          <td><span class="pill pill-malattia">🤒 Malattia</span></td>
+          <td>—</td>
+          <td>Manuale (🔒)</td>
+          <td>Il sistema cerca automaticamente copertura tra i colleghi disponibili.</td>
+        </tr>
+        <tr>
+          <td><span class="pill pill-ferie">🏖️ Ferie</span></td>
+          <td>—</td>
+          <td>Manuale (🔒)</td>
+          <td>Non conta nelle ore settimanali.</td>
+        </tr>
+        <tr>
+          <td><span class="pill pill-permesso">📋 Permesso</span></td>
+          <td>—</td>
+          <td>Manuale (🔒)</td>
+          <td>Non conta nelle ore settimanali.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="tip tip-purple">
+      <div class="tip-icon">✏️</div>
+      <div>Gli orari dei 3 turni e la pausa pranzo sono <strong>modificabili</strong> dal tab ⚙️ Turni → <em>Salva configurazione</em>. Le modifiche valgono per tutti i calcoli e per l'export Excel.</div>
+    </div>
+  </div>
+
+  <!-- LOGICA AUTOMATICA -->
+  <div class="card">
+    <div class="card-title">
+      <div class="icon">📊</div>
+      Come funziona la logica automatica
+    </div>
+
+    <h2>Ore contrattuali e giorni di lavoro</h2>
+    <div class="two-col">
+      <div class="info-box">
+        <strong>Full-time — 40h</strong>
+        <span>5 giorni di lavoro, 2 riposi a settimana</span>
+      </div>
+      <div class="info-box">
+        <strong>Part-time — 30h</strong>
+        <span>Circa 4 giorni di lavoro, 3 riposi</span>
+      </div>
+      <div class="info-box">
+        <strong>Part-time — 24h</strong>
+        <span>3 giorni di lavoro, 4 riposi</span>
+      </div>
+      <div class="info-box">
+        <strong>Part-time — 20h</strong>
+        <span>Circa 2–3 giorni, dipende dall'orario del turno</span>
+      </div>
+    </div>
+
+    <h2 style="margin-top:20px">Distribuzione dei riposi</h2>
+    <p style="font-size:13px;color:var(--muted);line-height:1.5">
+      Il generatore distribuisce i riposi preferendo i giorni infrasettimanali (lunedì–venerdì),
+      lasciando sabato e domenica come giorni lavorativi di default. La copertura minima viene sempre
+      rispettata: se togliere un dipendente da un giorno violerebbe il minimo, quel giorno viene
+      mantenuto come lavorativo e il riposo spostato altrove.
+    </p>
+
+    <h2 style="margin-top:20px">Domenica e fine settimana</h2>
+    <div class="tip tip-purple" style="margin-top:0">
+      <div class="tip-icon">📌</div>
+      <div>
+        <strong>Domenica chiusa (default)</strong> — tutti i dipendenti sono a riposo di domenica.<br>
+        <strong>Domenica aperta</strong> — cambia il menu a tendina in tab ⚙️ Turni → <em>Domenica aperto</em>.
+        Si salva automaticamente, senza bisogno di premere Salva. Il sabato è sempre lavorativo.
+      </div>
+    </div>
+
+    <h2 style="margin-top:20px">Copertura reparti</h2>
+    <p style="font-size:13px;color:var(--muted);margin-bottom:10px">
+      In fondo al calendario trovi la tabella di copertura giornaliera per ogni reparto:
+    </p>
+    <div class="cov-row">
+      <div><span class="ok">2/2</span> — copertura rispettata</div>
+      <div><span class="warn">1/2</span> — sotto il minimo</div>
+      <div><span class="err">0/2</span> — reparto scoperto!</div>
+      <div><span style="color:#4040a0;font-weight:700">—</span> — giorno chiuso</div>
+    </div>
+
+    <div class="tip tip-warn">
+      <div class="tip-icon">⚠️</div>
+      <div>Se la copertura è insufficiente significa che non ci sono abbastanza dipendenti per quel reparto in quel giorno. Aggiungi dipendenti al reparto oppure riduci la copertura minima richiesta.</div>
+    </div>
+  </div>
+
+  <!-- BARRA STATISTICHE -->
+  <div class="card">
+    <div class="card-title">
+      <div class="icon">📈</div>
+      Barra statistiche (in cima al calendario)
+    </div>
+    <p style="font-size:13px;color:var(--muted);margin-bottom:4px">Aggiornata in tempo reale ad ogni modifica:</p>
+    <div class="stat-row">
+      <div class="stat-box">
+        <div class="label">Attivi oggi</div>
+        <div class="val ok">5</div>
+      </div>
+      <div class="stat-box">
+        <div class="label">Assenti oggi</div>
+        <div class="val warn">1</div>
+      </div>
+      <div class="stat-box">
+        <div class="label">Straordinari sett.</div>
+        <div class="val pur">2h</div>
+      </div>
+      <div class="stat-box">
+        <div class="label">Copertura reparti</div>
+        <div class="val ok">100%</div>
+      </div>
+    </div>
+    <div class="tip tip-purple" style="margin-top:14px">
+      <div class="tip-icon">ℹ️</div>
+      <div><strong>Straordinari</strong> = ore lavorate oltre il contratto settimanale. Le ore in eccesso appaiono in rosso anche nella barra ore di ogni dipendente nel calendario.</div>
+    </div>
+  </div>
+
+  <!-- EXCEL -->
+  <div class="card">
+    <div class="card-title">
+      <div class="icon">📄</div>
+      File Excel — struttura dell'export
+    </div>
+    <p style="font-size:13px;color:var(--muted);margin-bottom:2px">Per ogni giorno ci sono 5 colonne. Struttura identica al formato ufficiale:</p>
+    <div class="excel-preview">
+      <div class="row">
+        <div class="cell head">REPARTO</div>
+        <div class="cell head">ADDETTO</div>
+        <div class="cell head">E mat.</div>
+        <div class="cell head">U mat.</div>
+        <div class="cell head">E pom.</div>
+        <div class="cell head">U pom.</div>
+        <div class="cell head">T</div>
+        <div class="cell head">…×7 gg…</div>
+        <div class="cell head total">WT</div>
+      </div>
+      <div class="row">
+        <div class="cell">CASSA</div>
+        <div class="cell">ROSSI MARIO</div>
+        <div class="cell work">09:30</div>
+        <div class="cell work">13:00</div>
+        <div class="cell work">15:30</div>
+        <div class="cell work">20:00</div>
+        <div class="cell work">8:00</div>
+        <div class="cell">…</div>
+        <div class="cell total">40:00</div>
+      </div>
+      <div class="row">
+        <div class="cell"></div>
+        <div class="cell">VERDI LUCIA</div>
+        <div class="cell rest">0</div>
+        <div class="cell rest"></div>
+        <div class="cell rest"></div>
+        <div class="cell rest"></div>
+        <div class="cell rest">0:00</div>
+        <div class="cell">…</div>
+        <div class="cell total">30:00</div>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:12px;font-size:12px">
+      <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px">
+        <strong>E</strong> = Entrata<br>
+        <span style="color:var(--muted)">Col.1: inizio mattina<br>Col.3: inizio pomeriggio</span>
+      </div>
+      <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px">
+        <strong>U</strong> = Uscita<br>
+        <span style="color:var(--muted)">Col.2: fine mattina<br>Col.4: fine pomeriggio</span>
+      </div>
+      <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px">
+        <strong>T</strong> = Totale ore giorno<br>
+        <strong>WT</strong> = Totale ore settimana
+      </div>
+    </div>
+
+    <div class="tip tip-green">
+      <div class="tip-icon">✅</div>
+      <div>Riposo → <strong>0</strong> in colonna E, <strong>0:00</strong> in T &nbsp;|&nbsp; Malattia → <strong>MAL</strong> &nbsp;|&nbsp; Ferie → <strong>FER</strong> &nbsp;|&nbsp; Permesso → <strong>PER</strong></div>
+    </div>
+  </div>
+
+  <!-- FAQ -->
+  <div class="card">
+    <div class="card-title">
+      <div class="icon">❓</div>
+      Domande frequenti
+    </div>
+    <div style="display:flex;flex-direction:column;gap:18px">
+
+      <div>
+        <strong style="font-size:14px">Il generatore mette tutti a riposo di domenica anche con "Domenica aperto" selezionato</strong>
+        <p style="font-size:13px;color:var(--muted);margin-top:4px">
+          Controlla che nel tab 🏪 Reparti nessun reparto abbia il lucchetto 🔒 attivo (domenica chiuso).
+          Anche con domenica aperta, se tutti i reparti sono impostati su "chiuso domenica" il generatore
+          non ha copertura da garantire. La domenica aperto si salva automaticamente al cambio del menu.
+        </p>
+      </div>
+
+      <div>
+        <strong style="font-size:14px">Ho cambiato gli orari dei turni o la pausa pranzo — devo rigenerare?</strong>
+        <p style="font-size:13px;color:var(--muted);margin-top:4px">Sì. Prima premi <em>Salva configurazione</em> nel tab ⚙️, poi ri-premi "Genera Turni Settimana". Le modifiche manuali già bloccate (🔒) non vengono sovrascritte; quelle automatiche sì.</p>
+      </div>
+
+      <div>
+        <strong style="font-size:14px">Posso gestire più settimane contemporaneamente?</strong>
+        <p style="font-size:13px;color:var(--muted);margin-top:4px">Sì. Naviga con le frecce: ogni settimana ha i propri turni salvati indipendentemente. Genera settimana per settimana, i dati non si sovrascrivono tra settimane diverse.</p>
+      </div>
+
+      <div>
+        <strong style="font-size:14px">Ho aggiunto un dipendente a metà settimana — cosa succede?</strong>
+        <p style="font-size:13px;color:var(--muted);margin-top:4px">Appare nel calendario senza turni. Puoi rigenerare (sovrascriverà i turni non bloccati) oppure assegnare manualmente i giorni rimanenti cliccando sulle celle.</p>
+      </div>
+
+      <div>
+        <strong style="font-size:14px">Un dipendente è andato in malattia — come gestisco la copertura?</strong>
+        <p style="font-size:13px;color:var(--muted);margin-top:4px">Clicca sulla cella del dipendente assente e seleziona 🤒 Malattia. L'app cerca automaticamente un collega a riposo nello stesso reparto e lo mette in copertura. Se non trova nessuno, appare un avviso nella tabella di copertura.</p>
+      </div>
+
+      <div>
+        <strong style="font-size:14px">Come resetto i turni di una settimana senza perdere le assenze manuali?</strong>
+        <p style="font-size:13px;color:var(--muted);margin-top:4px">Premi "🗑️ Resetta Turni Settimana" (sotto "Genera Turni" nel tab 👥 Staff): rimuove tutti i turni della settimana corrente incluse le assenze manuali. Per rigenerare mantenendo le assenze, usa invece "⚡ Genera Turni Settimana" che sovrascrive solo i turni automatici, non quelli bloccati.</p>
+      </div>
+
+      <div>
+        <strong style="font-size:14px">Ho perso i dati dopo aver pulito il browser!</strong>
+        <p style="font-size:13px;color:var(--muted);margin-top:4px">I dati sono salvati nel localStorage del browser. Cancellandolo si perdono. Esporta l'Excel a fine settimana come backup esterno.</p>
+      </div>
+
+      <div>
+        <strong style="font-size:14px">Funziona su Chrome, Edge, Firefox?</strong>
+        <p style="font-size:13px;color:var(--muted);margin-top:4px">Sì, su qualsiasi browser moderno. Serve connessione internet solo al primo avvio per caricare i font e la libreria Excel (poi viene messa in cache).</p>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="footer">
+    ShiftFlow v2.0 — Gestione Turni Automatica<br>
+    Per assistenza tecnica contatta il responsabile IT
+  </div>
+
+</div>
+</body>
+</html>

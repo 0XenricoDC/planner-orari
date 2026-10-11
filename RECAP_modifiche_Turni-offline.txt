@@ -1,0 +1,138 @@
+RECAP MODIFICHE - Turni-offline.html
+Sessione del 27/09/2026
+=====================================================================
+
+IN BREVE
+  1) Algoritmo: tutti a ore e giorni esatti di contratto (40h)
+  2) Tema scuro con pulsante
+  3) Colori per riposo / ferie / assenze
+  4) Restyling grafico (solo CSS)
+  5) Export Excel: titoli uniti, colori per reparto, legenda, controllo ore
+  6) Uso da telefono: barra in basso, vista "Giorno"
+  Motore turni modificato solo al punto 1; tutto il resto e' interfaccia.
+
+1) ALGORITMO: 40 ORE GARANTITE
+---------------------------------------------------------------------
+Problema: in ogni generazione 1-5 dipendenti finivano a 39,5h invece di 40h.
+Causa: le ore erano solo una "penalita'" leggera nel calcolo; mezz'ora in
+meno pesava poco e il generatore restava bloccato li'.
+
+Fix: aggiunta una rifinitura finale (funzioni polish / bestResponse nel
+motore). Dopo la generazione, per ogni dipendente sceglie la settimana
+migliore con ORE e GIORNI di contratto come vincolo obbligatorio,
+tenendo la copertura il piu' alta possibile.
+- Il modo di costruire i turni non e' cambiato.
+- Rispetta orari fissi, giorni bloccati, ferie, malattia, riposi,
+  solo mattina / solo pomeriggio.
+- Funziona anche con contratti ridotti (es. 33,5h su 5 giorni con 1 giorno
+  di ferie, 26,5h su 4 giorni con 2 di malattia, 30h Dipendente 11).
+- Si ferma sempre da solo, aggiunge meno di 1 secondo.
+Verificato: tutti a ore e giorni esatti su 2 settimane x 3 generazioni
++ 1 settimana di prova con ferie parziali, malattia e richieste.
+Nota: per chiudere esattamente a 40h a volte usa un ingresso posticipato
+(10:30 / 16:00), quindi nelle settimane corte di personale possono
+comparire brevi scoperture a inizio turno (es. 5-11 ottobre, con 2
+persone in ferie).
+
+2) TEMA SCURO
+---------------------------------------------------------------------
+- Pulsante "Tema scuro / Tema chiaro" in alto a destra (icone sole/luna).
+- La scelta viene ricordata nel browser; di default segue il sistema.
+- Palette scura dedicata (non e' il tema chiaro invertito).
+
+3) COLORI RIPOSO / FERIE / ASSENZE (pagina)
+---------------------------------------------------------------------
+- Riposo: verde con barra laterale (prima grigio, poco visibile).
+- Ferie: arancione a righe, scritta FERIE in maiuscolo, bordo evidente.
+- Malattia/assenza: rosa a righe, scritta ASSENTE.
+- "In <reparto>" (vista per reparto): grigio neutro, non si confonde piu'
+  con il riposo.
+- Stessi colori per le etichette nella scheda Richieste.
+
+4) RESTYLING GRAFICO (solo CSS, logica invariata)
+---------------------------------------------------------------------
+- Nuova palette indaco, ombre leggere, angoli arrotondati.
+- Intestazione con logo, barra semitrasparente, sottolineatura animata
+  della scheda attiva.
+- Pulsanti piu' grandi, "Rigenera turni" evidenziato come azione principale,
+  "Elimina" rossa al passaggio del mouse.
+- Tabella turni: colonne sabato/domenica evidenziate, riga evidenziata al
+  passaggio del mouse, intestazioni reparto in maiuscolo con barra blu,
+  orari in grassetto e allineati.
+- Copertura e "Da sistemare": etichette colorate, spunta verde se tutto ok.
+- Pannello di modifica con animazione, sfondo sfocato, mattina/pomeriggio
+  con sfumatura gialla/blu.
+- Liste (Dipendenti, Richieste, Riposi) con righe evidenziate.
+- Font IBM Plex se c'e' internet, altrimenti font di sistema.
+- Rispetta "riduci animazioni" del sistema; focus da tastiera visibile.
+
+5) EXPORT EXCEL
+---------------------------------------------------------------------
+Foglio turni
+- Titolo e sottotitolo: celle unite e centrate (titolo su fascia blu).
+- Ogni reparto ha un colore: titolo del reparto su fascia unita,
+  centrata e colorata, con il minimo richiesto (es. "PED - minimo 2").
+- Legenda in alto a destra (colonna L): colori dei reparti, riposo /
+  ferie / assente, significato dei colori delle ore.
+- Celle colorate col colore del reparto quando un dipendente copre un
+  altro reparto (bordo spesso + testo in grassetto). Le celle in cui
+  lavora nel proprio reparto restano neutre. Se nello stesso giorno
+  lavora in due reparti, nella cella compare "+ REPARTO".
+- Chi viene da un altro reparto ha il nome evidenziato con "(da REPARTO)".
+- Nuova colonna "Ore settimana" (totale della persona): VERDE se uguale
+  al contratto, ROSSA se sopra o sotto. E' una formattazione
+  condizionale: se modifichi il valore in Excel il colore si aggiorna.
+  Il controllo e' rispetto alle ore di contratto: 40h per quasi tutti,
+  30h per Dipendente 11, meno in caso di ferie parziali.
+- La colonna "Ore reparto" (ore nel singolo reparto) resta com'era.
+- RIPOSO verde, FERIE arancione, ASSENTE rosa, anche nelle righe di chi
+  e' in ferie tutta la settimana. Prima riposo e "altro reparto" avevano
+  lo stesso giallo.
+Foglio "Riepilogo ore"
+- Titolo unito e centrato, riga di spiegazione dei colori.
+- Colonna "Ore pianificate" verde/rossa con la stessa regola automatica.
+Tecnico
+- Il generatore Excel interno (MiniExcel) ora supporta unione celle
+  (mergeCells) e formattazione condizionale (addConditionalFormatting),
+  con la stessa interfaccia di ExcelJS.
+Verificato: il file si apre in Excel senza errori ne' riparazioni; le
+regole condizionali e le celle unite funzionano.
+
+6) USO DA TELEFONO
+---------------------------------------------------------------------
+- Barra di navigazione in basso con le 5 schede e le icone, come in
+  un'app (prima 3 schede su 5 erano nascoste).
+- Turni, nuova vista "Giorno" (predefinita su telefono): fila di pulsanti
+  lun-dom (pallino rosso sui giorni con copertura da sistemare), elenco
+  a schermo pieno dei dipendenti di quel giorno per reparto con "x al
+  lavoro", ore della settimana (rosse se fuori contratto). Si tocca una
+  persona per modificarla. Sotto: copertura del giorno e avvisi.
+- Interruttore "Giorno / Settimana" per tornare alla tabella completa.
+- Pulsanti d'azione in una griglia ordinata, campi e pulsanti piu'
+  grandi al tocco (44px), niente zoom automatico nei campi su iPhone.
+- Reparti e orari: ogni riga diventa una scheda leggibile (Mattina e
+  Pomeriggio su righe separate).
+- Riposi: colonna dei nomi bloccata mentre si scorre.
+- Niente evidenziazioni "appiccicose" dopo il tocco.
+- Fix: su telefono l'intestazione non usa lo sfocato, che faceva
+  comparire la barra di navigazione in alto invece che in basso.
+- Su computer non cambia nulla.
+
+FILE AGGIUNTI
+---------------------------------------------------------------------
+- _harness_offline.js : test Node che esegue il motore reale di
+  Turni-offline.html sui dati salvati nel file e stampa chi non e' a
+  ore/giorni di contratto e i buchi di copertura.
+  Uso: node _harness_offline.js 2026-10-12 4 1
+- RECAP_modifiche_Turni-offline.txt : questo file.
+
+COMMIT (ramo master, nessun repository remoto)
+---------------------------------------------------------------------
+- 3c0005b feat(offline): 40h garantite, tema scuro, restyling ed export
+          Excel migliorato  (punti 1-5 + harness + recap)
+- 7a39f2d chore: file di supporto e modifiche in sospeso precedenti alla
+          sessione (shift-planner.html, preset, Excel di esempio,
+          screenshot, CLAUDE.md, ISTRUZIONI.html, _harness.js, lancedb/)
+- 1d99dff feat(offline): pagina usabile da telefono  (punto 6)
+Attenzione: preset ed Excel contengono nomi reali dei dipendenti; se il
+repository viene pubblicato, tenerlo privato.
